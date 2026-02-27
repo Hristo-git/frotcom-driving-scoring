@@ -12,7 +12,10 @@ export default async function DashboardPage(props: {
     const searchParams = await props.searchParams;
 
     const engine = new ScoringEngine();
-    // await engine.connect();
+
+    if (!process.env.DATABASE_URL) {
+        console.error('DATABASE_URL is not defined in environment variables!');
+    }
 
     // Default to current month
     const now = new Date();
@@ -57,7 +60,9 @@ export default async function DashboardPage(props: {
         engine.getVehiclePerformance(start, end, { weights, countryName: selectedCountry, warehouseName: selectedWarehouse })
     ]);
 
-    // await engine.disconnect();
+    // console.log(`Fetched: ${drivers.length} drivers, ${countries.length} countries, ${warehouses.length} warehouses, ${vehicles.length} vehicles`);
+    console.log(`[Dashboard] Range: ${start} to ${end}`);
+    console.log(`[Dashboard] Fetched: ${drivers.length} drivers, ${countries.length} countries, ${warehouses.length} warehouses, ${vehicles.length} vehicles`);
 
     return (
         <DashboardClient

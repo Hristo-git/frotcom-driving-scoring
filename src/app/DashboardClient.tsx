@@ -63,6 +63,14 @@ export default function DashboardClient({
     drivers, countries, warehouses, vehicles, startDate, endDate, weights,
     selectedCountry, selectedWarehouse
 }: DashboardProps) {
+    console.log('[DashboardClient] Props:', {
+        driverCount: drivers.length,
+        countryCount: countries.length,
+        warehouseCount: warehouses.length,
+        vehicleCount: vehicles.length,
+        startDate,
+        endDate
+    });
     const router = useRouter();
     const [start, setStart] = useState(startDate.split('T')[0]);
     const [end, setEnd] = useState(endDate.split('T')[0]);

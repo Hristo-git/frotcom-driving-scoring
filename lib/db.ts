@@ -13,6 +13,9 @@ declare global {
 }
 
 if (!global.postgresPool) {
+    if (!process.env.DATABASE_URL) {
+        console.error('DATABASE_URL environment variable is missing!');
+    }
     global.postgresPool = new Pool({
         connectionString: process.env.DATABASE_URL,
         ssl: {
