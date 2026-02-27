@@ -1,7 +1,7 @@
 'use client';
 
 import React from 'react';
-import { ScoringWeights } from '../../lib/scoring';
+import type { ScoringWeights } from '../../lib/scoring';
 import {
     IconAccelLow,
     IconAccelHigh,
