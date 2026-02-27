@@ -1,91 +1,98 @@
 
-import { FrotcomClient, FrotcomDriver, FrotcomVehicleDetails } from './frotcom';
-import { Client } from 'pg';
+import { FrotcomClient, FrotcomDriver } from './frotcom';
+import pool from './db';
+import dotenv from 'dotenv';
+import path from 'path';
 
-// Database client configuration would ideally be imported from a db module to reuse connection
-// For now, I'll instantiate a new client here or assume a global pool.
-// Better practice: create a lib/db.ts
+dotenv.config({ path: path.resolve(process.cwd(), '.env.local') });
+
+function sanitize(str: string | undefined): string {
+    if (!str) return '';
+    // Postgres doesn't like null bytes
+    return str.replace(/\u0000/g, '').trim();
+}
 
 export async function syncDriversAndVehicles() {
-    const db = new Client({
-        connectionString: process.env.DATABASE_URL,
-    });
+    console.log('Starting synchronization...');
 
-    await db.connect();
     try {
+        console.log('Database pool ready.');
+
+        console.log('Fetching drivers from Frotcom...');
+        const drivers = await FrotcomClient.getDrivers();
+        console.log(`Fetched ${drivers.length} drivers.`);
+
         console.log('Fetching vehicles from Frotcom...');
         const vehicles = await FrotcomClient.getVehicles();
-        console.log(`Found ${vehicles.length} vehicles.`);
+        console.log(`Fetched ${vehicles.length} vehicles.`);
 
-        for (const vehicle of vehicles) {
-            console.log(`Processing vehicle ${vehicle.license_plate} (${vehicle.id})...`);
-
-            // Fetch details to get Department (Warehouse) and Segment (Country)
-            const details = await FrotcomClient.getVehicleDetails(vehicle.id);
-
-            // Upsert Country (Segment)
-            let countryId = null;
-            if (details.segment) {
-                const countryRes = await db.query(
-                    `INSERT INTO countries (name) VALUES ($1) 
-           ON CONFLICT (name) DO UPDATE SET name = EXCLUDED.name 
-           RETURNING id`,
-                    [details.segment]
-                );
-                countryId = countryRes.rows[0].id;
-            }
-
-            // Upsert Warehouse (Department)
-            let warehouseId = null;
-            if (details.department) {
-                const warehouseRes = await db.query(
-                    `INSERT INTO warehouses (name) VALUES ($1) 
-           ON CONFLICT (name) DO UPDATE SET name = EXCLUDED.name 
-           RETURNING id`,
-                    [details.department]
-                );
-                warehouseId = warehouseRes.rows[0].id;
-            }
-
-            // We need to link this vehicle to a "driver" concept.
-            // In Frotcom, vehicles and drivers are distinct. 
-            // If the goal is "Driver Behavior", we strictly need Drivers.
-            // If the user said "Get vehicle details" gives department/segment, 
-            // maybe the driver is assigned to the vehicle?
-            // Frotcom has "Associated Driver". Let's check if details has it.
-            // For now, I'll store the VEHICLE as the main entity if no driver info is present,
-            // OR I should fetch All Drivers and try to link them?
-            // The user's prompt implies we are scoring DRIVERS by Country/Warehouse.
-            // Country/Warehouse comes from the VEHICLE (Department/Segment).
-            // So we need: Driver -> Period -> Vehicle (driven) -> Warehouse/Country.
-
-            // Step 1: Just ensure the Vehicle exists in DB with its metadata.
-            // We might need a separate table for "Objects" or generic "Assets" if "drivers" table is strictly for humans.
-            // For now, assuming we just sync metadata.
-
-            // Let's look for a Driver field in Vehicle Details?
-            // If not, we rely on Ecodriving API to give us the driver data.
-
-            // But we need to filter proper valid drivers.
-            // Let's try to fetch Drivers list too.
-        }
-
-        // Fetch Drivers
-        const drivers = await FrotcomClient.getDrivers();
-        console.log(`Found ${drivers.length} drivers.`);
+        const countriesMap = new Map<string, number>();
+        const warehousesMap = new Map<string, number>();
 
         for (const driver of drivers) {
-            await db.query(
-                `INSERT INTO drivers (name, frotcom_id, external_id) 
-           VALUES ($1, $2, $3)
-           ON CONFLICT (frotcom_id) DO NOTHING`,
-                [driver.name, driver.id, driver.employee_no]
+            // Sync Country (Segment)
+            if (driver.segment && driver.segmentId) {
+                const countryRes = await pool.query(
+                    `INSERT INTO countries (name, frotcom_id) VALUES ($1, $2) 
+                     ON CONFLICT (name) DO UPDATE SET frotcom_id = EXCLUDED.frotcom_id 
+                     RETURNING id`,
+                    [sanitize(driver.segment), driver.segmentId.toString()]
+                );
+                countriesMap.set(driver.segment, countryRes.rows[0].id);
+            }
+
+            // Sync Warehouse (Department)
+            if (driver.department && driver.departmentId) {
+                const warehouseRes = await pool.query(
+                    `INSERT INTO warehouses (name, frotcom_id) VALUES ($1, $2) 
+                     ON CONFLICT (name) DO UPDATE SET frotcom_id = EXCLUDED.frotcom_id 
+                     RETURNING id`,
+                    [sanitize(driver.department), driver.departmentId.toString()]
+                );
+                warehousesMap.set(driver.department, warehouseRes.rows[0].id);
+            }
+
+            const countryId = driver.segment ? countriesMap.get(driver.segment) : null;
+            const warehouseId = driver.department ? warehousesMap.get(driver.department) : null;
+
+            // Sync Driver
+            await pool.query(
+                `INSERT INTO drivers (name, frotcom_id, country_id, warehouse_id, metadata) 
+                 VALUES ($1, $2, $3, $4, $5)
+                 ON CONFLICT (frotcom_id) DO UPDATE SET 
+                    name = EXCLUDED.name,
+                    country_id = EXCLUDED.country_id,
+                    warehouse_id = EXCLUDED.warehouse_id,
+                    metadata = EXCLUDED.metadata`,
+                [
+                    sanitize(driver.name),
+                    driver.id.toString(),
+                    countryId,
+                    warehouseId,
+                    JSON.stringify(driver).replace(/\\u0000/g, '') // Sanitize JSON too
+                ]
             );
         }
 
+        for (const vehicle of vehicles) {
+            await pool.query(
+                `INSERT INTO vehicles (frotcom_id, license_plate, metadata) 
+                 VALUES ($1, $2, $3)
+                 ON CONFLICT (frotcom_id) DO UPDATE SET 
+                    license_plate = EXCLUDED.license_plate,
+                    metadata = EXCLUDED.metadata,
+                    updated_at = NOW()`,
+                [
+                    vehicle.id.toString(),
+                    sanitize(vehicle.licensePlate),
+                    JSON.stringify(vehicle).replace(/\\u0000/g, '')
+                ]
+            );
+        }
+
+        console.log('Metadata synchronization complete.');
+
     } catch (error) {
-        console.error('Error syncing metadata:', error);
-    } finally {
-        await db.end();
+        console.error('Error during synchronization:', error);
     }
 }

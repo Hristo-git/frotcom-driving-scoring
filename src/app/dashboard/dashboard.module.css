@@ -1,0 +1,396 @@
+.container {
+  padding: 24px;
+  max-width: 1400px;
+  margin: 0 auto;
+  min-height: 100vh;
+}
+
+.header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 32px;
+}
+
+.title {
+  font-size: 28px;
+  font-weight: 700;
+  color: var(--foreground);
+  letter-spacing: -0.5px;
+  text-shadow: 0 0 20px rgba(59, 130, 246, 0.5);
+}
+
+.navTabs {
+  display: flex;
+  gap: 4px;
+  background: rgba(0, 0, 0, 0.4);
+  padding: 4px;
+  border-radius: 8px;
+  border: 1px solid var(--card-border);
+  backdrop-filter: blur(10px);
+}
+
+.navTab {
+  padding: 8px 24px;
+  border-radius: 6px;
+  border: none;
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 600;
+  color: #94a3b8;
+  background-color: transparent;
+  transition: all 0.3s ease;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.navTabActive {
+  background-color: rgba(59, 130, 246, 0.2) !important;
+  color: #60a5fa !important;
+  box-shadow: inset 0 0 0 1px rgba(59, 130, 246, 0.5);
+}
+
+.navTab:hover:not(.navTabActive) {
+  background-color: rgba(255, 255, 255, 0.05);
+  color: var(--foreground);
+}
+
+/* Glassmorphism Cards */
+.card {
+  padding: 24px;
+  border-radius: 12px;
+  background: var(--card-bg);
+  border: 1px solid var(--card-border);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  transition: transform 0.3s ease, box-shadow 0.3s ease;
+}
+
+.card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.3), inset 0 0 0 1px rgba(255, 255, 255, 0.1);
+}
+
+.cardTitle {
+  font-size: 13px;
+  color: #94a3b8;
+  margin-bottom: 12px;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  font-weight: 600;
+}
+
+.cardValue {
+  font-size: 36px;
+  font-weight: 800;
+  color: var(--foreground);
+  line-height: 1.2;
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 24px;
+  margin-bottom: 32px;
+}
+
+.flexRow {
+  display: flex;
+  gap: 24px;
+  margin-bottom: 32px;
+}
+
+.flexCol {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+}
+
+/* Filter Controls */
+.filters {
+  display: flex;
+  gap: 16px;
+  align-items: center;
+  background: var(--card-bg);
+  padding: 12px 20px;
+  border-radius: 12px;
+  border: 1px solid var(--card-border);
+  backdrop-filter: blur(10px);
+}
+
+.modeToggle {
+  display: flex;
+  gap: 12px;
+  font-size: 14px;
+  color: #cbd5e1;
+}
+
+.modeToggle label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+}
+
+.filterInput {
+  background: rgba(0, 0, 0, 0.3);
+  border: 1px solid var(--card-border);
+  color: var(--foreground);
+  padding: 8px 12px;
+  border-radius: 6px;
+  font-family: inherit;
+  color-scheme: dark;
+  /* Ensures date picker popup is dark in supported browsers */
+}
+
+.button {
+  padding: 8px 20px;
+  background: linear-gradient(135deg, var(--accent-primary), var(--accent-hover));
+  color: white;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  font-weight: 600;
+  transition: all 0.2s ease;
+  box-shadow: 0 4px 12px rgba(37, 99, 235, 0.3);
+}
+
+.button:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 6px 16px rgba(37, 99, 235, 0.4);
+}
+
+/* Tables -> Leaderboard style */
+.sectionTitle {
+  font-size: 20px;
+  font-weight: 700;
+  margin-bottom: 16px;
+  color: var(--foreground);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.sectionTitle::before {
+  content: '';
+  display: block;
+  width: 4px;
+  height: 20px;
+  background: var(--accent-primary);
+  border-radius: 2px;
+}
+
+.tableContainer {
+  overflow-x: auto;
+  border-radius: 12px;
+  background: var(--card-bg);
+  border: 1px solid var(--card-border);
+  backdrop-filter: blur(12px);
+  flex: 1;
+}
+
+.table {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+}
+
+.table th {
+  background-color: rgba(0, 0, 0, 0.4);
+  color: #94a3b8;
+  font-weight: 600;
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  padding: 16px;
+  border-bottom: 1px solid var(--card-border);
+}
+
+.table td {
+  padding: 16px;
+  color: var(--foreground);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+  font-size: 14px;
+}
+
+.table tr:last-child td {
+  border-bottom: none;
+}
+
+.clickableRow {
+  cursor: pointer;
+  transition: background-color 0.2s ease;
+}
+
+.clickableRow:hover {
+  background-color: rgba(255, 255, 255, 0.05);
+}
+
+.selectedRow {
+  background-color: rgba(59, 130, 246, 0.15) !important;
+  box-shadow: inset 2px 0 0 var(--accent-primary);
+}
+
+.selectedRow td {
+  font-weight: 600;
+  color: #e0e7ff;
+}
+
+/* Scores & Neon Colors */
+.scoreHigh {
+  color: var(--success) !important;
+  text-shadow: 0 0 10px rgba(16, 185, 129, 0.4);
+}
+
+.scoreMed {
+  color: var(--warning) !important;
+  text-shadow: 0 0 10px rgba(245, 158, 11, 0.4);
+}
+
+.scoreLow {
+  color: var(--danger) !important;
+  text-shadow: 0 0 10px rgba(239, 68, 68, 0.4);
+}
+
+/* Filter Badges */
+.filterBadgeContainer {
+  display: flex;
+  gap: 12px;
+  margin-top: 16px;
+}
+
+.filterBadge {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  background: rgba(59, 130, 246, 0.15);
+  color: #93c5fd;
+  padding: 6px 14px;
+  border-radius: 20px;
+  font-size: 13px;
+  font-weight: 600;
+  border: 1px solid rgba(59, 130, 246, 0.3);
+  backdrop-filter: blur(4px);
+}
+
+.filterBadge button {
+  background: none;
+  border: none;
+  color: #60a5fa;
+  cursor: pointer;
+  padding: 0;
+  font-size: 18px;
+  line-height: 1;
+  display: flex;
+  align-items: center;
+  transition: color 0.2s;
+}
+
+.filterBadge button:hover {
+  color: #ffffff;
+}
+
+/* Layout Specifics for Redesign */
+.dashboardMain {
+  display: flex;
+  gap: 24px;
+  height: 600px;
+  margin-bottom: 32px;
+}
+
+.mapSection {
+  flex: 2;
+  border-radius: 12px;
+  overflow: hidden;
+  border: 1px solid var(--card-border);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+  position: relative;
+}
+
+.chartsSection {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+.leaderboardSection {
+  background: var(--card-bg);
+  border: 1px solid var(--card-border);
+  border-radius: 12px;
+  backdrop-filter: blur(12px);
+  padding: 24px;
+}
+
+.vehicleTag {
+  display: inline-block;
+  padding: 2px 8px;
+  font-size: 11px;
+  font-weight: 600;
+  font-family: 'JetBrains Mono', monospace;
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 4px;
+  color: #cbd5e1;
+  white-space: nowrap;
+}
+
+/* Filter Redesign: Large Tiles */
+.filterGroup {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-bottom: 24px;
+  padding: 16px;
+  background: rgba(255, 255, 255, 0.02);
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.filterLabel {
+  font-size: 12px;
+  font-weight: 700;
+  color: #94a3b8;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.filterTileContainer {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.filterTile {
+  padding: 10px 18px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+  color: #cbd5e1;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  user-select: none;
+}
+
+.filterTile:hover {
+  background: rgba(59, 130, 246, 0.1);
+  border-color: rgba(59, 130, 246, 0.3);
+  transform: translateY(-1px);
+}
+
+.filterTileActive {
+  background: rgba(59, 130, 246, 0.2) !important;
+  border-color: #3b82f6 !important;
+  color: #60a5fa !important;
+  font-weight: 700;
+  box-shadow: 0 4px 12px rgba(59, 130, 246, 0.2);
+}
