@@ -1,66 +1,75 @@
-import Image from "next/image";
-import styles from "./page.module.css";
 
-export default function Home() {
-  return (
-    <div className={styles.page}>
-      <main className={styles.main}>
-        <Image
-          className={styles.logo}
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
+import { ScoringEngine, DEFAULT_WEIGHTS, ScoringWeights } from '../../lib/scoring';
+import DashboardClient from './DashboardClient';
+// import { unstable_noStore as noStore } from 'next/cache'; // Optional based on caching needs
+
+export default async function DashboardPage(props: {
+    searchParams?: Promise<{ [key: string]: string | string[] | undefined }>;
+}) {
+    // noStore(); 
+
+    // Handle searchParam promise for newer Next.js versions
+    const searchParams = await props.searchParams;
+
+    const engine = new ScoringEngine();
+    // await engine.connect();
+
+    // Default to current month
+    const now = new Date();
+    // Start of current month (UTC)
+    const firstDay = new Date(Date.UTC(now.getFullYear(), now.getMonth(), 1));
+    const startStr = firstDay.toISOString();
+
+    // End of current month (UTC)
+    const lastDay = new Date(Date.UTC(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59, 999));
+    const endStr = lastDay.toISOString();
+
+    const start = (searchParams?.start as string) || startStr;
+    const end = (searchParams?.end as string) || endStr;
+    const selectedCountry = searchParams?.country as string | undefined;
+    const selectedWarehouse = searchParams?.warehouse as string | undefined;
+
+    // Helper to get weight from searchParams or default
+    const getW = (key: string, def: number) => {
+        const val = searchParams?.[key];
+        return val ? parseFloat(val as string) : def;
+    };
+
+    const weights: ScoringWeights = {
+        harshAccelerationLow: getW('hal', DEFAULT_WEIGHTS.harshAccelerationLow),
+        harshAccelerationHigh: getW('hah', DEFAULT_WEIGHTS.harshAccelerationHigh),
+        harshBrakingLow: getW('hbl', DEFAULT_WEIGHTS.harshBrakingLow),
+        harshBrakingHigh: getW('hbh', DEFAULT_WEIGHTS.harshBrakingHigh),
+        harshCornering: getW('hc', DEFAULT_WEIGHTS.harshCornering),
+        accelBrakeSwitch: getW('abs', DEFAULT_WEIGHTS.accelBrakeSwitch),
+        excessiveIdling: getW('ei', DEFAULT_WEIGHTS.excessiveIdling),
+        highRPM: getW('hr', DEFAULT_WEIGHTS.highRPM),
+        alarms: getW('al', DEFAULT_WEIGHTS.alarms),
+        noCruiseControl: getW('ncc', DEFAULT_WEIGHTS.noCruiseControl),
+        accelDuringCruise: getW('adc', DEFAULT_WEIGHTS.accelDuringCruise),
+    };
+
+    // Fetch data in parallel
+    const [drivers, countries, warehouses, vehicles] = await Promise.all([
+        engine.getDriverPerformance(start, end, { weights, countryName: selectedCountry, warehouseName: selectedWarehouse }),
+        engine.getCountryPerformance(start, end, { warehouseName: selectedWarehouse, weights }),
+        engine.getWarehousePerformance(start, end, weights, { countryName: selectedCountry }),
+        engine.getVehiclePerformance(start, end, { weights, countryName: selectedCountry, warehouseName: selectedWarehouse })
+    ]);
+
+    // await engine.disconnect();
+
+    return (
+        <DashboardClient
+            drivers={drivers}
+            countries={countries}
+            warehouses={warehouses}
+            vehicles={vehicles}
+            startDate={start}
+            endDate={end}
+            weights={weights}
+            selectedCountry={selectedCountry}
+            selectedWarehouse={selectedWarehouse}
         />
-        <div className={styles.intro}>
-          <h1>To get started, edit the page.tsx file.</h1>
-          <p>
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              target="_blank"
-              rel="noopener noreferrer"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              target="_blank"
-              rel="noopener noreferrer"
-            >
-              Learning
-            </a>{" "}
-            center.
-          </p>
-        </div>
-        <div className={styles.ctas}>
-          <a
-            className={styles.primary}
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className={styles.logo}
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={16}
-            />
-            Deploy Now
-          </a>
-          <a
-            className={styles.secondary}
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
-        </div>
-      </main>
-    </div>
-  );
+    );
 }
