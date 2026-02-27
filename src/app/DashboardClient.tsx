@@ -115,7 +115,7 @@ export default function DashboardClient({
         params.set('ncc', currentWeights.noCruiseControl.toString());
         params.set('adc', currentWeights.accelDuringCruise.toString());
 
-        router.push(`/dashboard?${params.toString()}`);
+        router.push(`/?${params.toString()}`);
         if (view === 'settings') setView('report');
     };
 
@@ -138,14 +138,14 @@ export default function DashboardClient({
             }
         }
 
-        router.push(`/dashboard?${params.toString()}`);
+        router.push(`/?${params.toString()}`);
     };
 
     const removeFilter = (type: 'country' | 'warehouse') => {
         const params = new URLSearchParams(window.location.search);
         params.delete(type);
         if (type === 'country') params.delete('warehouse');
-        router.push(`/dashboard?${params.toString()}`);
+        router.push(`/?${params.toString()}`);
     };
 
     const overallScore = drivers.length > 0
