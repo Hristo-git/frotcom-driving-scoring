@@ -23,14 +23,12 @@ async function compareRecords() {
         console.log(`\n--- Record ID: ${row.id} ---`);
         console.log(`Score: ${row.overall_score}`);
         console.log(`Period: ${row.period_start} to ${row.period_end}`);
-        console.log(`Calculated At: ${row.calculated_at}`);
-        console.log(`Metrics:`, JSON.stringify(row.metrics, null, 2));
-
-        const evtRes = await pool.query(
-            `SELECT count(*) FROM ecodriving_events WHERE driver_id = $1 AND DATE(started_at AT TIME ZONE 'Europe/Sofia') = DATE($2 AT TIME ZONE 'Europe/Sofia')`,
-            [row.driver_id, row.period_start]
-        );
-        console.log(`Events in DB for this date: ${evtRes.rows[0].count}`);
+        const aggRes = await pool.query(`
+            SELECT count(*) FROM ecodriving_events 
+            WHERE driver_id = $1 
+              AND DATE(started_at AT TIME ZONE 'Europe/Sofia') = (TO_CHAR($2 AT TIME ZONE 'UTC' AT TIME ZONE 'Europe/Sofia', 'YYYY-MM-DD'))::date
+        `, [row.driver_id, row.period_start]);
+        console.log(`Events in DB for Sofia date matches: ${aggRes.rows[0].count}`);
     }
 
     await pool.end();

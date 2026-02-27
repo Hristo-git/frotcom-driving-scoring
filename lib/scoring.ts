@@ -321,9 +321,9 @@ export class ScoringEngine {
             JOIN drivers d ON es.driver_id = d.id
             LEFT JOIN countries c ON d.country_id = c.id
             LEFT JOIN warehouses w ON d.warehouse_id = w.id
-            WHERE DATE(es.period_start AT TIME ZONE 'Europe/Sofia')
+            WHERE DATE((es.period_start AT TIME ZONE 'UTC') AT TIME ZONE 'Europe/Sofia')
                   >= DATE($1::timestamptz AT TIME ZONE 'Europe/Sofia')
-              AND DATE(es.period_end   AT TIME ZONE 'Europe/Sofia')
+              AND DATE((es.period_end AT TIME ZONE 'UTC') AT TIME ZONE 'Europe/Sofia')
                   <= DATE($2::timestamptz AT TIME ZONE 'Europe/Sofia')
         `;
 

@@ -124,7 +124,7 @@ async function run() {
     // Get all driver/day combinations in ecodriving_scores
     const scoresRes = await pool.query(`
         SELECT DISTINCT driver_id,
-               DATE(period_start AT TIME ZONE 'Europe/Sofia') AS day
+               DATE((period_start AT TIME ZONE 'UTC') AT TIME ZONE 'Europe/Sofia') AS day
         FROM ecodriving_scores
     `);
     console.log(`Updating ${scoresRes.rows.length} driver-day combinations...`);
@@ -163,7 +163,7 @@ async function run() {
                 'eventDurations', $2::jsonb
             )
             WHERE driver_id = $3
-              AND DATE(period_start AT TIME ZONE 'Europe/Sofia') = $4
+              AND DATE((period_start AT TIME ZONE 'UTC') AT TIME ZONE 'Europe/Sofia') = $4
         `, [
             JSON.stringify(eventCounts),
             JSON.stringify(eventDurations),
