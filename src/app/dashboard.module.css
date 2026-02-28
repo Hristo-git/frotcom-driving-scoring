@@ -476,7 +476,21 @@
   }
 
   .grid {
-    grid-template-columns: 1fr;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 12px;
+  }
+
+  .card {
+    padding: 12px;
+  }
+
+  .cardTitle {
+    font-size: 10px;
+    margin-bottom: 6px;
+  }
+
+  .cardValue {
+    font-size: 20px;
   }
 
   .dashboardMain {
@@ -485,7 +499,7 @@
   }
 
   .mapSection {
-    min-height: 400px;
+    min-height: 250px;
     flex: none;
   }
 

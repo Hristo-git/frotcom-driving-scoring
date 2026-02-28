@@ -767,16 +767,18 @@ export default function DashboardClient({
                             />
                         </div>
 
-                        <div className={styles.chartsSection}>
-                            <div className={styles.card} style={{ flex: 1 }}>
-                                <h2 className={styles.sectionTitle} style={{ marginTop: 0 }}>Warehouse Performance</h2>
-                                <WarehouseChart
-                                    data={chartData}
-                                    selectedWarehouse={selectedWarehouse || null}
-                                    onWarehouseSelect={(wh) => handleFilterClick('warehouse', wh)}
-                                />
+                        {chartData && chartData.length > 0 && (
+                            <div className={styles.chartsSection}>
+                                <div className={styles.card} style={{ flex: 1 }}>
+                                    <h2 className={styles.sectionTitle} style={{ marginTop: 0 }}>Warehouse Performance</h2>
+                                    <WarehouseChart
+                                        data={chartData}
+                                        selectedWarehouse={selectedWarehouse || null}
+                                        onWarehouseSelect={(wh) => handleFilterClick('warehouse', wh)}
+                                    />
+                                </div>
                             </div>
-                        </div>
+                        )}
                     </div>
 
                     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '20px', marginTop: '32px' }}>
