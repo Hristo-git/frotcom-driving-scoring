@@ -59,6 +59,20 @@ const EVENT_TRANSLATIONS: Record<string, { label: string, Icon?: React.FC }> = {
     excessiveIdling: { label: 'Празен ход', Icon: IconIdling }
 };
 
+const RECOMMENDATION_TRANSLATIONS: Record<string, string> = {
+    harshAccelerationLow: 'Намалете резките ускорения при ниска скорост.',
+    harshAccelerationHigh: 'Избягвайте резките ускорения при висока скорост.',
+    harshBrakingLow: 'Намалете резките спирания при ниска скорост.',
+    harshBrakingHigh: 'Избягвайте резките спирания при висока скорост.',
+    sharpCornering: 'Намалете скоростта преди завой, за да избегнете резки маневри.',
+    suddenBrakeThrottleChange: 'Избягвайте бързата и директна смяна между газ и спирачка.',
+    excessiveIdling: 'Гасете двигателя при постоянен престой за по-малко работа на място.',
+    highRPM: 'Сменяйте предавките по-рано, за да избегнете движение в превишени обороти.',
+    alarms: 'Обърнете внимание на алармите от автомобила.',
+    timeWithoutCruiseControl: 'Използвайте круиз контрол по-често при дълги пътувания.',
+    accelerationOnCruiseControl: 'Избягвайте ръчното ускорение, когато круиз контролът е активен.'
+};
+
 export default function DashboardClient({
     drivers, countries, warehouses, vehicles, startDate, endDate, weights,
     selectedCountry, selectedWarehouse
@@ -76,7 +90,7 @@ export default function DashboardClient({
     const [end, setEnd] = useState(endDate.split('T')[0]);
     const [mode, setMode] = useState<'single' | 'range'>('range');
     const [currentWeights, setCurrentWeights] = useState<ScoringWeights>(weights);
-    const [view, setView] = useState<'report' | 'settings' | 'vehicles'>('report');
+    const [view, setView] = useState<'report' | 'settings' | 'vehicles' | 'drivers'>('report');
     const [selectedBrand, setSelectedBrand] = useState<string | null>(null);
     const [selectedModel, setSelectedModel] = useState<string | null>(null);
     const [expandedDriver, setExpandedDriver] = useState<number | null>(null);
@@ -357,6 +371,10 @@ export default function DashboardClient({
                             onClick={() => setView('vehicles')}
                         >Автомобили</button>
                         <button
+                            className={`${styles.navTab} ${view === 'drivers' ? styles.navTabActive : ''}`}
+                            onClick={() => setView('drivers')}
+                        >Шофьори</button>
+                        <button
                             className={`${styles.navTab} ${view === 'settings' ? styles.navTabActive : ''}`}
                             onClick={() => setView('settings')}
                         >Настройки</button>
@@ -534,6 +552,66 @@ export default function DashboardClient({
                                         <td colSpan={6} style={{ textAlign: 'center', padding: '40px', color: '#94a3b8' }}>
                                             Няма намерени автомобили за избраните филтри.
                                         </td>
+                                    </tr>
+                                )}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            ) : view === 'drivers' ? (
+                <div style={{ padding: '20px 0' }}>
+                    <div className={styles.tableContainer} style={{ maxHeight: '70vh', overflowY: 'auto' }}>
+                        <table className={styles.table}>
+                            <thead style={{ position: 'sticky', top: 0, background: 'var(--card-bg)', zIndex: 1 }}>
+                                <tr>
+                                    <th style={{ textAlign: 'left', minWidth: 150 }}>ШОФЬОР</th>
+                                    <th style={{ textAlign: 'center', minWidth: 80 }}>ТОЧКИ</th>
+                                    <th style={{ textAlign: 'center', minWidth: 120 }}>СРЕДНО ВРЕМЕ</th>
+                                    <th style={{ textAlign: 'center', minWidth: 120 }}>СРЕДЕН РАЗХОД</th>
+                                    <th style={{ textAlign: 'left', minWidth: 150 }}>АВТОМОБИЛИ</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {sortedDrivers.length > 0 ? sortedDrivers.map((d) => (
+                                    <React.Fragment key={d.driverId}>
+                                        <tr className={styles.clickableRow} onClick={() => setExpandedDriver(expandedDriver === d.driverId ? null : d.driverId)}>
+                                            <td style={{ fontWeight: 600 }}>{d.driverName}</td>
+                                            <td style={{ textAlign: 'center', fontSize: '1.2em', fontWeight: 800 }} className={getScoreClass(d.score)}>
+                                                {d.score.toFixed(2)}
+                                            </td>
+                                            <td style={{ textAlign: 'center' }}>
+                                                {formatTime(d.drivingTime)} ч.
+                                            </td>
+                                            <td style={{ textAlign: 'center' }}>
+                                                {d.consumption > 0 ? `${d.consumption.toFixed(1)} L/100km` : '—'}
+                                            </td>
+                                            <td style={{ fontSize: '0.9em', color: '#64748b' }}>
+                                                {(d.vehicles && d.vehicles.length > 0) ? d.vehicles.join(', ') : '—'}
+                                            </td>
+                                        </tr>
+                                        {expandedDriver === d.driverId && (
+                                            <tr>
+                                                <td colSpan={5} style={{ padding: '16px 24px', background: 'rgba(0, 0, 0, 0.2)', borderBottom: '1px solid var(--border-color)' }}>
+                                                    <div style={{ fontSize: '0.9em', color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '12px' }}>ПРЕПОРЪКИ ЗА ПОДОБРЯВАНЕ (FROTCOM):</div>
+                                                    {(!d.recommendations || d.recommendations.length === 0) ? (
+                                                        <div style={{ color: '#10b981', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                                            <div style={{ padding: '6px', borderRadius: '50%', background: 'rgba(16, 185, 129, 0.1)' }}>✓</div>
+                                                            Няма конкретни препоръки за избрания период. Шофирането е отлично!
+                                                        </div>
+                                                    ) : (
+                                                        <ul style={{ margin: 0, paddingLeft: '20px', color: '#cbd5e1', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                                                            {d.recommendations.map((rec, i) => (
+                                                                <li key={i}>{RECOMMENDATION_TRANSLATIONS[rec] || rec}</li>
+                                                            ))}
+                                                        </ul>
+                                                    )}
+                                                </td>
+                                            </tr>
+                                        )}
+                                    </React.Fragment>
+                                )) : (
+                                    <tr>
+                                        <td colSpan={5} style={{ textAlign: 'center', padding: '40px', color: '#94a3b8' }}>Няма данни</td>
                                     </tr>
                                 )}
                             </tbody>

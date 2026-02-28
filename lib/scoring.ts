@@ -47,6 +47,7 @@ export interface PerformanceReport {
     consumption: number;
     rpm: number;
     vehicles: string[];    // license plates driven in this period
+    recommendations: string[]; // failing criteria/recommendations
     dataPoints: number;
     events: Record<string, number>;
     eventCounts?: Record<string, number>;
@@ -206,6 +207,7 @@ export class ScoringEngine {
                         totalConsumption: 0,
                         totalRPM: 0,
                         vehicles: new Set<string>(),
+                        recommendations: new Set<string>(),
                         events: {} as Record<string, number>,
                         count: 0
                     });
@@ -220,6 +222,10 @@ export class ScoringEngine {
                 d.totalRPM += rpm;
                 d.count++;
                 rowVehicles.forEach((p: string) => d.vehicles.add(p));
+
+                if (Array.isArray(row.metrics.failingCriteria)) {
+                    row.metrics.failingCriteria.forEach((crit: string) => d.recommendations.add(crit));
+                }
 
                 // Aggregate events
                 if (row.metrics.eventCounts) {
@@ -243,6 +249,7 @@ export class ScoringEngine {
                 consumption: parseFloat((d.totalConsumption / d.count).toFixed(2)),
                 rpm: parseFloat((d.totalRPM / d.count).toFixed(2)),
                 vehicles: [...d.vehicles].sort(),
+                recommendations: [...d.recommendations].sort(),
                 dataPoints: d.count,
                 events: d.events
             })).sort((a, b) => b.score - a.score);
