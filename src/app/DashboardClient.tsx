@@ -622,49 +622,90 @@ export default function DashboardClient({
                                     >
                                         СРЕДЕН РАЗХОД {getSortIcon('consumption')}
                                     </th>
-                                    <th style={{ textAlign: 'left', minWidth: 150 }}>АВТОМОБИЛИ</th>
+                                    <th
+                                        style={{ textAlign: 'left', minWidth: 200, cursor: 'pointer' }}
+                                        onClick={() => handleDriverSort('vehicles')}
+                                    >
+                                        АВТОМОБИЛИ {getSortIcon('vehicles')}
+                                    </th>
                                 </tr>
                             </thead>
                             <tbody>
                                 {sortedDrivers.length > 0 ? sortedDrivers.map((d) => (
                                     <React.Fragment key={d.driverId}>
-                                        <tr className={styles.clickableRow} onClick={() => setExpandedDriver(expandedDriver === d.driverId ? null : d.driverId)}>
-                                            <td style={{ fontWeight: 600 }}>{d.driverName}</td>
+                                        <tr
+                                            className={`${styles.clickableRow} ${expandedDriver === d.driverId ? styles.rowActive : ''}`}
+                                            onClick={() => setExpandedDriver(expandedDriver === d.driverId ? null : d.driverId)}
+                                        >
+                                            <td style={{ fontWeight: 600, color: '#f8fafc' }}>
+                                                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                                    <span style={{
+                                                        width: '8px',
+                                                        height: '8px',
+                                                        borderRadius: '50%',
+                                                        background: d.score >= 7 ? '#10b981' : d.score >= 4 ? '#f59e0b' : '#ef4444'
+                                                    }}></span>
+                                                    {d.driverName}
+                                                </div>
+                                            </td>
                                             <td style={{ textAlign: 'center', fontSize: '1.2em', fontWeight: 800 }} className={getScoreClass(d.score)}>
                                                 {d.score.toFixed(2)}
                                             </td>
-                                            <td style={{ textAlign: 'center' }}>
+                                            <td style={{ textAlign: 'center', color: '#cbd5e1' }}>
                                                 {formatTime(d.drivingTime)} ч.
                                             </td>
-                                            <td style={{ textAlign: 'center' }}>
+                                            <td style={{ textAlign: 'center', color: '#cbd5e1' }}>
                                                 {d.consumption > 0 ? `${d.consumption.toFixed(1)} L/100km` : '—'}
                                             </td>
-                                            <td style={{ fontSize: '0.9em', color: '#64748b' }}>
+                                            <td style={{ fontSize: '0.9em', color: '#94a3b8' }}>
                                                 {(d.vehicles && d.vehicles.length > 0) ? d.vehicles.join(', ') : '—'}
                                             </td>
                                         </tr>
                                         {expandedDriver === d.driverId && (
                                             <tr>
-                                                <td colSpan={5} style={{ padding: '16px 24px', background: 'rgba(0, 0, 0, 0.2)', borderBottom: '1px solid var(--border-color)' }}>
-                                                    <div style={{ fontSize: '0.9em', color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '12px' }}>ПРЕПОРЪКИ ЗА ПОДОБРЯВАНЕ (FROTCOM):</div>
-                                                    {(!d.recommendations || d.recommendations.length === 0) ? (
-                                                        d.score >= 7.0 ? (
-                                                            <div style={{ color: '#10b981', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                                                <div style={{ padding: '6px', borderRadius: '50%', background: 'rgba(16, 185, 129, 0.1)' }}>✓</div>
-                                                                Няма конкретни препоръки за избрания период. Шофирането е отлично!
+                                                <td colSpan={5} style={{ padding: '0', background: 'rgba(15, 23, 42, 0.4)' }}>
+                                                    <div style={{ padding: '20px 24px', borderLeft: '4px solid var(--accent-color)' }}>
+                                                        <div style={{ fontSize: '0.85em', color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '1px', marginBottom: '16px', fontWeight: 700 }}>
+                                                            Препоръки за подобряване на представянето:
+                                                        </div>
+
+                                                        {(!d.recommendations || d.recommendations.length === 0) ? (
+                                                            <div style={{ color: '#10b981', display: 'flex', alignItems: 'center', gap: '10px', fontSize: '1.05em' }}>
+                                                                <span style={{ fontSize: '1.4em' }}>🏆</span>
+                                                                Браво! Шофирането е в отлични граници. Продължавай все така!
                                                             </div>
                                                         ) : (
-                                                            <div style={{ color: '#94a3b8', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                                                Няма конкретни препоръки за избрания период.
+                                                            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                                                                {d.recommendations.map((rec, i) => (
+                                                                    <div key={i} style={{
+                                                                        display: 'flex',
+                                                                        alignItems: 'center',
+                                                                        gap: '12px',
+                                                                        padding: '12px 16px',
+                                                                        background: 'rgba(255, 255, 255, 0.03)',
+                                                                        borderRadius: '8px',
+                                                                        border: '1px solid rgba(255, 255, 255, 0.05)'
+                                                                    }}>
+                                                                        <span style={{ color: '#f59e0b', fontSize: '1.2em' }}>💡</span>
+                                                                        <span style={{ color: '#f1f5f9', lineHeight: '1.4' }}>
+                                                                            {RECOMMENDATION_TRANSLATIONS[rec] || rec}
+                                                                        </span>
+                                                                    </div>
+                                                                ))}
                                                             </div>
-                                                        )
-                                                    ) : (
-                                                        <ul style={{ margin: 0, paddingLeft: '20px', color: '#cbd5e1', display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                                                            {d.recommendations.map((rec, i) => (
-                                                                <li key={i}>{RECOMMENDATION_TRANSLATIONS[rec] || rec}</li>
-                                                            ))}
-                                                        </ul>
-                                                    )}
+                                                        )}
+
+                                                        <div style={{ marginTop: '20px', display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: '12px' }}>
+                                                            <div style={{ background: 'rgba(255, 255, 255, 0.02)', padding: '10px', borderRadius: '6px', textAlign: 'center' }}>
+                                                                <div style={{ fontSize: '0.75em', color: '#64748b', marginBottom: '4px' }}>ИЗМИНАТО РАЗСТОЯНИЕ</div>
+                                                                <div style={{ fontWeight: 600 }}>{Math.round(d.distance).toLocaleString('bg-BG')} km</div>
+                                                            </div>
+                                                            <div style={{ background: 'rgba(255, 255, 255, 0.02)', padding: '10px', borderRadius: '6px', textAlign: 'center' }}>
+                                                                <div style={{ fontSize: '0.75em', color: '#64748b', marginBottom: '4px' }}>ОБЩО ВРЕМЕ</div>
+                                                                <div style={{ fontWeight: 600 }}>{formatTime(d.drivingTime)} ч.</div>
+                                                            </div>
+                                                        </div>
+                                                    </div>
                                                 </td>
                                             </tr>
                                         )}
