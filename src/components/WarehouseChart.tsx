@@ -73,7 +73,7 @@ export default function WarehouseChart({ data, selectedWarehouse, onWarehouseSel
             <ResponsiveContainer width="100%" height="100%">
                 <BarChart
                     data={sortedData}
-                    margin={{ top: 20, right: 30, left: 0, bottom: 20 }}
+                    margin={{ top: 20, right: 30, left: 40, bottom: 20 }}
                     layout="vertical" // Horizontal bars often look better in dashboards for long names
                 >
                     <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" horizontal={false} />
@@ -89,8 +89,8 @@ export default function WarehouseChart({ data, selectedWarehouse, onWarehouseSel
                         dataKey="name"
                         type="category"
                         stroke="#64748b"
-                        tick={{ fill: '#e2e8f0', fontSize: 12 }}
-                        width={120}
+                        tick={{ fill: '#e2e8f0', fontSize: 10 }}
+                        width={100}
                     />
 
                     <Tooltip cursor={{ fill: 'rgba(255,255,255,0.05)' }} content={<CustomTooltip />} />
