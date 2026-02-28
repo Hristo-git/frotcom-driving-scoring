@@ -33,6 +33,26 @@ export const DEFAULT_WEIGHTS: ScoringWeights = {
     accelDuringCruise: 0,   // Ускорение при круиз контрол
 };
 
+/**
+ * Maps Frotcom recommendation IDs → human-readable criteria names.
+ * Used for legacy data support where recommendations were stored as numeric IDs.
+ */
+export const RECOMMENDATION_LABELS: Record<number, string> = {
+    1: 'harshAccelerationLow',
+    2: 'harshAccelerationHigh',
+    3: 'harshBrakingLow',
+    4: 'harshBrakingHigh',
+    5: 'sharpCornering',
+    6: 'suddenBrakeThrottleChange',
+    7: 'excessiveIdling',
+    8: 'highRPM',
+    9: 'alarms',
+    10: 'timeWithoutCruiseControl',
+    11: 'accelerationOnCruiseControl',
+    12: 'criterion12',
+    13: 'criterion13',
+};
+
 export interface PerformanceReport {
     driverId: number;
     driverName: string;
@@ -225,6 +245,14 @@ export class ScoringEngine {
 
                 if (Array.isArray(row.metrics.failingCriteria)) {
                     row.metrics.failingCriteria.forEach((crit: string) => d.recommendations.add(crit));
+                }
+
+                // Support legacy recommendations (numeric IDs)
+                if (Array.isArray(row.metrics.recommendations)) {
+                    row.metrics.recommendations.forEach((id: number) => {
+                        const label = RECOMMENDATION_LABELS[id];
+                        if (label) d.recommendations.add(label);
+                    });
                 }
 
                 // Aggregate events
