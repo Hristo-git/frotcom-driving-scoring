@@ -648,10 +648,16 @@ export default function DashboardClient({
                                                 <td colSpan={5} style={{ padding: '16px 24px', background: 'rgba(0, 0, 0, 0.2)', borderBottom: '1px solid var(--border-color)' }}>
                                                     <div style={{ fontSize: '0.9em', color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '12px' }}>ПРЕПОРЪКИ ЗА ПОДОБРЯВАНЕ (FROTCOM):</div>
                                                     {(!d.recommendations || d.recommendations.length === 0) ? (
-                                                        <div style={{ color: '#10b981', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                                            <div style={{ padding: '6px', borderRadius: '50%', background: 'rgba(16, 185, 129, 0.1)' }}>✓</div>
-                                                            Няма конкретни препоръки за избрания период. Шофирането е отлично!
-                                                        </div>
+                                                        d.score >= 7.0 ? (
+                                                            <div style={{ color: '#10b981', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                                                <div style={{ padding: '6px', borderRadius: '50%', background: 'rgba(16, 185, 129, 0.1)' }}>✓</div>
+                                                                Няма конкретни препоръки за избрания период. Шофирането е отлично!
+                                                            </div>
+                                                        ) : (
+                                                            <div style={{ color: '#94a3b8', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                                                Няма конкретни препоръки за избрания период.
+                                                            </div>
+                                                        )
                                                     ) : (
                                                         <ul style={{ margin: 0, paddingLeft: '20px', color: '#cbd5e1', display: 'flex', flexDirection: 'column', gap: '8px' }}>
                                                             {d.recommendations.map((rec, i) => (

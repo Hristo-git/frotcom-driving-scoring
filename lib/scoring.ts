@@ -221,6 +221,7 @@ export class ScoringEngine {
                     driverMap.set(driverId, {
                         ...row,
                         totalScore: 0,
+                        scoreCount: 0,
                         totalDistance: 0,
                         totalDrivingTime: 0,
                         totalIdling: 0,
@@ -234,13 +235,21 @@ export class ScoringEngine {
                 }
 
                 const d = driverMap.get(driverId);
-                d.totalScore += score;
+
+                // Exclude low-mileage days with 0 score from the averages as they are usually data artifacts
+                const isSkippedForAverage = score === 0 && row.metrics.hasLowMileage;
+
+                if (!isSkippedForAverage) {
+                    d.totalScore += score;
+                    d.scoreCount++;
+                    d.totalIdling += idling;
+                    d.totalConsumption += consumption;
+                    d.totalRPM += rpm;
+                    d.count++;
+                }
+
                 d.totalDistance += distance;
                 d.totalDrivingTime += drivingTime;
-                d.totalIdling += idling;
-                d.totalConsumption += consumption;
-                d.totalRPM += rpm;
-                d.count++;
                 rowVehicles.forEach((p: string) => d.vehicles.add(p));
 
                 if (Array.isArray(row.metrics.failingCriteria)) {
@@ -270,12 +279,12 @@ export class ScoringEngine {
                 warehouse: d.warehouse || 'Unknown',
                 countryId: d.country_id,
                 warehouseId: d.warehouse_id,
-                score: parseFloat((d.totalScore / d.count).toFixed(2)),
+                score: d.scoreCount > 0 ? parseFloat((d.totalScore / d.scoreCount).toFixed(2)) : 0,
                 distance: parseFloat(d.totalDistance.toFixed(1)),
                 drivingTime: Math.round(d.totalDrivingTime),
-                idling: parseFloat((d.totalIdling / d.count).toFixed(2)),
-                consumption: parseFloat((d.totalConsumption / d.count).toFixed(2)),
-                rpm: parseFloat((d.totalRPM / d.count).toFixed(2)),
+                idling: d.count > 0 ? parseFloat((d.totalIdling / d.count).toFixed(2)) : 0,
+                consumption: d.count > 0 ? parseFloat((d.totalConsumption / d.count).toFixed(2)) : 0,
+                rpm: d.count > 0 ? parseFloat((d.totalRPM / d.count).toFixed(2)) : 0,
                 vehicles: [...d.vehicles].sort(),
                 recommendations: [...d.recommendations].sort(),
                 dataPoints: d.count,
