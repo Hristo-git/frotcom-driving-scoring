@@ -212,17 +212,21 @@ export default function DashboardClient({
     };
 
     // Prepare map data
-    const mapData = countries.map(c => ({
-        name: c.name,
-        score: c.score,
-        driverCount: c.driversCount
-    }));
+    const mapData = countries
+        .filter(c => c.name && c.name.trim() !== '')
+        .map(c => ({
+            name: c.name,
+            score: c.score,
+            driverCount: c.driversCount
+        }));
 
     // Prepare chart data
-    const chartData = warehouses.map(w => ({
-        name: w.name,
-        score: w.score
-    }));
+    const chartData = warehouses
+        .filter(w => w.name && w.name.trim() !== '')
+        .map(w => ({
+            name: w.name,
+            score: w.score
+        }));
 
     // Split drivers by score categories
     const sortedDriversRaw = [...drivers].sort((a, b) => {
@@ -758,30 +762,34 @@ export default function DashboardClient({
                         </div>
                     </div>
 
-                    <div className={styles.dashboardMain}>
-                        <div className={styles.mapSection}>
-                            <LocationsMap
-                                data={mapData}
-                                selectedLocation={selectedCountry || null}
-                                onLocationSelect={(loc) => handleFilterClick('country', loc)}
-                            />
-                        </div>
-
-                        {chartData && chartData.length > 0 && (
-                            <div className={styles.chartsSection}>
-                                <div className={styles.card} style={{ flex: 1 }}>
-                                    <h2 className={styles.sectionTitle} style={{ marginTop: 0 }}>Warehouse Performance</h2>
-                                    <WarehouseChart
-                                        data={chartData}
-                                        selectedWarehouse={selectedWarehouse || null}
-                                        onWarehouseSelect={(wh) => handleFilterClick('warehouse', wh)}
+                    {((mapData && mapData.length > 0) || (chartData && chartData.length > 0)) && (
+                        <div className={styles.dashboardMain}>
+                            {mapData && mapData.length > 0 && (
+                                <div className={styles.mapSection}>
+                                    <LocationsMap
+                                        data={mapData}
+                                        selectedLocation={selectedCountry || null}
+                                        onLocationSelect={(loc) => handleFilterClick('country', loc)}
                                     />
                                 </div>
-                            </div>
-                        )}
-                    </div>
+                            )}
 
-                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '20px', marginTop: '32px' }}>
+                            {chartData && chartData.length > 0 && (
+                                <div className={styles.chartsSection}>
+                                    <div className={styles.card} style={{ flex: 1 }}>
+                                        <h2 className={styles.sectionTitle} style={{ marginTop: 0 }}>Warehouse Performance</h2>
+                                        <WarehouseChart
+                                            data={chartData}
+                                            selectedWarehouse={selectedWarehouse || null}
+                                            onWarehouseSelect={(wh) => handleFilterClick('warehouse', wh)}
+                                        />
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+                    )}
+
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '20px', marginTop: '24px' }}>
                         <div className={styles.flexCol}>
                             <h2 className={styles.sectionTitle} style={{ marginTop: 0, color: '#10b981' }}>Отлични ({excellentPct}%)</h2>
                             <div className={styles.tableContainer} style={{ maxHeight: '400px', overflowY: 'auto' }}>
