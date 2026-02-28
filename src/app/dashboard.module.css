@@ -499,7 +499,8 @@
   }
 
   .mapSection {
-    min-height: 250px;
+    height: 300px;
+    min-height: auto;
     flex: none;
   }
 
