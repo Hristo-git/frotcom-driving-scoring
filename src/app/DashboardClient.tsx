@@ -94,6 +94,8 @@ export default function DashboardClient({
     const [selectedBrand, setSelectedBrand] = useState<string | null>(null);
     const [selectedModel, setSelectedModel] = useState<string | null>(null);
     const [expandedDriver, setExpandedDriver] = useState<number | null>(null);
+    const [driverSortField, setDriverSortField] = useState<string>('score');
+    const [driverSortOrder, setDriverSortOrder] = useState<'asc' | 'desc'>('desc');
 
     React.useEffect(() => {
         setStart(startDate.split('T')[0]);
@@ -170,6 +172,20 @@ export default function DashboardClient({
         router.push(`/?${params.toString()}`);
     };
 
+    const handleDriverSort = (field: string) => {
+        if (driverSortField === field) {
+            setDriverSortOrder(driverSortOrder === 'asc' ? 'desc' : 'asc');
+        } else {
+            setDriverSortField(field);
+            setDriverSortOrder('desc');
+        }
+    };
+
+    const getSortIcon = (field: string) => {
+        if (driverSortField !== field) return '↕';
+        return driverSortOrder === 'asc' ? '↑' : '↓';
+    };
+
     const overallScore = drivers.length > 0
         ? (drivers.reduce((acc, d) => acc + d.score, 0) / drivers.length).toFixed(2)
         : '0.00';
@@ -209,10 +225,28 @@ export default function DashboardClient({
     }));
 
     // Split drivers by score categories
-    const sortedDrivers = [...drivers].sort((a, b) => b.score - a.score);
-    const excellentDrivers = sortedDrivers.filter(d => d.score >= 7.0); // Green
-    const goodDrivers = sortedDrivers.filter(d => d.score >= 4.0 && d.score < 7.0); // Orange
-    const attentionDrivers = sortedDrivers.filter(d => d.score < 4.0); // Red
+    const sortedDriversRaw = [...drivers].sort((a, b) => {
+        const field = driverSortField as keyof typeof a;
+        let valA = a[field];
+        let valB = b[field];
+
+        if (typeof valA === 'string' && typeof valB === 'string') {
+            return driverSortOrder === 'asc'
+                ? valA.localeCompare(valB, 'bg')
+                : valB.localeCompare(valA, 'bg');
+        }
+
+        const numA = Number(valA) || 0;
+        const numB = Number(valB) || 0;
+
+        return driverSortOrder === 'asc' ? numA - numB : numB - numA;
+    });
+
+    const sortedDrivers = sortedDriversRaw; // For score categorization, we might still want the default score sort, but let's see. 
+    // Actually, excellentDrivers etc should probably stay sorted by score for the overview.
+    const excellentDrivers = [...drivers].sort((a, b) => b.score - a.score).filter(d => d.score >= 7.0); // Green
+    const goodDrivers = [...drivers].sort((a, b) => b.score - a.score).filter(d => d.score >= 4.0 && d.score < 7.0); // Orange
+    const attentionDrivers = [...drivers].sort((a, b) => b.score - a.score).filter(d => d.score < 4.0); // Red
 
     const excellentPct = activeDrivers > 0 ? Math.round((excellentDrivers.length / activeDrivers) * 100) : 0;
     const goodPct = activeDrivers > 0 ? Math.round((goodDrivers.length / activeDrivers) * 100) : 0;
@@ -564,10 +598,30 @@ export default function DashboardClient({
                         <table className={styles.table}>
                             <thead style={{ position: 'sticky', top: 0, background: 'var(--card-bg)', zIndex: 1 }}>
                                 <tr>
-                                    <th style={{ textAlign: 'left', minWidth: 150 }}>ШОФЬОР</th>
-                                    <th style={{ textAlign: 'center', minWidth: 80 }}>ТОЧКИ</th>
-                                    <th style={{ textAlign: 'center', minWidth: 120 }}>СРЕДНО ВРЕМЕ</th>
-                                    <th style={{ textAlign: 'center', minWidth: 120 }}>СРЕДЕН РАЗХОД</th>
+                                    <th
+                                        style={{ textAlign: 'left', minWidth: 150, cursor: 'pointer' }}
+                                        onClick={() => handleDriverSort('driverName')}
+                                    >
+                                        ШОФЬОР {getSortIcon('driverName')}
+                                    </th>
+                                    <th
+                                        style={{ textAlign: 'center', minWidth: 80, cursor: 'pointer' }}
+                                        onClick={() => handleDriverSort('score')}
+                                    >
+                                        ТОЧКИ {getSortIcon('score')}
+                                    </th>
+                                    <th
+                                        style={{ textAlign: 'center', minWidth: 120, cursor: 'pointer' }}
+                                        onClick={() => handleDriverSort('drivingTime')}
+                                    >
+                                        СРЕДНО ВРЕМЕ {getSortIcon('drivingTime')}
+                                    </th>
+                                    <th
+                                        style={{ textAlign: 'center', minWidth: 120, cursor: 'pointer' }}
+                                        onClick={() => handleDriverSort('consumption')}
+                                    >
+                                        СРЕДЕН РАЗХОД {getSortIcon('consumption')}
+                                    </th>
                                     <th style={{ textAlign: 'left', minWidth: 150 }}>АВТОМОБИЛИ</th>
                                 </tr>
                             </thead>
