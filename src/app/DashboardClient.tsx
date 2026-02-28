@@ -722,7 +722,7 @@ export default function DashboardClient({
                         </div>
                     </div>
 
-                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '20px', marginTop: '32px' }}>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '20px', marginTop: '32px' }}>
                         <div className={styles.flexCol}>
                             <h2 className={styles.sectionTitle} style={{ marginTop: 0, color: '#10b981' }}>Отлични ({excellentPct}%)</h2>
                             <div className={styles.tableContainer} style={{ maxHeight: '400px', overflowY: 'auto' }}>

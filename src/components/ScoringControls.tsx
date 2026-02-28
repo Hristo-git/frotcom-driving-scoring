@@ -2,6 +2,7 @@
 
 import React from 'react';
 import type { ScoringWeights } from '../../lib/scoring';
+import styles from '../app/dashboard.module.css';
 import {
     IconAccelLow,
     IconAccelHigh,
@@ -95,7 +96,7 @@ export default function ScoringControls({ weights, onChange, onApply }: ScoringC
                 {criteria.map((item) => {
                     const val = weights[item.key as keyof ScoringWeights];
                     return (
-                        <div key={item.key} style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+                        <div key={item.key} className={styles.scoringRow} style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
                             {/* Icon badge — dark square like Frotcom */}
                             <div style={{
                                 width: '38px',
@@ -112,12 +113,12 @@ export default function ScoringControls({ weights, onChange, onApply }: ScoringC
                             </div>
 
                             {/* Label */}
-                            <div style={{ flex: 1, fontSize: '14px', color: '#4a5568', fontWeight: 500 }}>
+                            <div className={styles.scoringLabel} style={{ flex: 1, fontSize: '14px', color: '#4a5568', fontWeight: 500 }}>
                                 {item.label}
                             </div>
 
                             {/* Slider with blue fill */}
-                            <div style={{ width: '250px', position: 'relative', display: 'flex', alignItems: 'center' }}>
+                            <div className={styles.scoringSliderWrapper} style={{ width: '250px', position: 'relative', display: 'flex', alignItems: 'center' }}>
                                 <div style={{
                                     position: 'absolute',
                                     left: 0,
@@ -171,6 +172,8 @@ export default function ScoringControls({ weights, onChange, onApply }: ScoringC
                 paddingTop: '20px',
                 borderTop: '1px solid #edf2f7',
                 display: 'flex',
+                flexWrap: 'wrap',
+                gap: '20px',
                 justifyContent: 'space-between',
                 alignItems: 'center'
             }}>
@@ -181,7 +184,7 @@ export default function ScoringControls({ weights, onChange, onApply }: ScoringC
                         (Теглата ще бъдат автоматично нормирани)
                     </span>
                 </div>
-                <div style={{ display: 'flex', gap: '12px' }}>
+                <div className={styles.scoringActions} style={{ display: 'flex', gap: '12px' }}>
                     <button
                         onClick={() => window.location.reload()}
                         style={{
