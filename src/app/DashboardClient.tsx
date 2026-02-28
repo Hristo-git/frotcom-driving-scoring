@@ -349,7 +349,7 @@ export default function DashboardClient({
                             {d.events && Object.keys(d.events).length > 0 && (
                                 <div>
                                     <div style={{ fontSize: '0.85em', color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '8px' }}>Влияещи фактори (на 100км):</div>
-                                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '12px' }}>
+                                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '8px' }}>
                                         {Object.entries(d.events).map(([key, count]) => {
                                             const trans = EVENT_TRANSLATIONS[key] || { label: key };
                                             const Icon = trans.Icon as any;
@@ -375,6 +375,22 @@ export default function DashboardClient({
                                             );
                                         })}
                                     </div>
+                                </div>
+                            )}
+
+                            {(!d.events || Object.keys(d.events).length === 0) && (
+                                <div style={{
+                                    padding: '12px',
+                                    background: 'rgba(34, 197, 94, 0.05)',
+                                    borderRadius: '8px',
+                                    border: '1px dashed rgba(34, 197, 94, 0.2)',
+                                    color: '#4ade80',
+                                    fontSize: '0.9em',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    gap: '8px'
+                                }}>
+                                    <span>✨</span> Няма записани критични събития за периода. Шофирането е плавно.
                                 </div>
                             )}
                         </div>

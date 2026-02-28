@@ -10,6 +10,15 @@
   justify-content: space-between;
   align-items: center;
   margin-bottom: 32px;
+  position: sticky;
+  top: 0;
+  z-index: 100;
+  background: rgba(15, 23, 42, 0.8);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  padding: 16px 24px;
+  margin: -24px -24px 32px -24px;
+  border-bottom: 1px solid var(--card-border);
 }
 
 .title {
@@ -366,6 +375,17 @@
   display: flex;
   flex-wrap: wrap;
   gap: 10px;
+  overflow-x: auto;
+  padding-bottom: 4px;
+}
+
+.filterTileContainer::-webkit-scrollbar {
+  height: 4px;
+}
+
+.filterTileContainer::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 2px;
 }
 
 .filterTile {
@@ -404,54 +424,54 @@
   .header {
     flex-direction: column;
     align-items: stretch;
-    gap: 16px;
+    gap: 12px;
+    padding: 12px;
+    margin: -12px -12px 24px -12px;
+  }
+
+  .filterTileContainer {
+    flex-wrap: nowrap;
+    margin: 0 -4px;
+    padding: 4px;
+    mask-image: linear-gradient(to right, black 85%, transparent 100%);
+  }
+
+  .filterTile {
+    padding: 8px 14px;
+    font-size: 13px;
+    white-space: nowrap;
+    flex-shrink: 0;
   }
 
   .title {
-    font-size: 24px;
+    font-size: 20px;
     text-align: center;
   }
 
   .header>div:first-child>div {
     text-align: center;
+    font-size: 12px;
   }
 
   .header>div:nth-child(2) {
     flex-direction: column;
     align-items: stretch !important;
+    gap: 10px;
   }
 
   .navTabs {
-    overflow-x: auto;
-    justify-content: flex-start;
-    padding-bottom: 4px;
-    /* Hide scrollbar for cleaner look */
-    -ms-overflow-style: none;
-    scrollbar-width: none;
-  }
-
-  .navTabs::-webkit-scrollbar {
-    display: none;
-  }
-
-  .navTab {
-    white-space: nowrap;
-    flex-shrink: 0;
+    justify-content: center;
   }
 
   .filters {
-    flex-direction: column;
-    align-items: stretch;
-  }
-
-  .modeToggle {
-    justify-content: center;
-    margin-bottom: 8px;
+    gap: 10px;
+    padding: 10px;
   }
 
   .filterBadgeContainer {
     flex-wrap: wrap;
     justify-content: center;
+    margin-top: 8px;
   }
 
   .grid {

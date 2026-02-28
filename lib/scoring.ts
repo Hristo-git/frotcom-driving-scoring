@@ -264,11 +264,36 @@ export class ScoringEngine {
                     });
                 }
 
-                // Aggregate events
                 if (row.metrics.eventCounts) {
                     for (const [key, val] of Object.entries(row.metrics.eventCounts)) {
                         d.events[key] = (d.events[key] || 0) + (val as number);
                     }
+                }
+            });
+
+            // --- NEW: Atomic fetch of granular events from ecodriving_events ---
+            // This ensures data from the manual sync (which stores into ecodriving_events)
+            // is reflected in the dashboard even if not yet in ecodriving_scores' metrics.
+            const eventQuery = `
+                SELECT 
+                    driver_id, event_type, COUNT(*) as count
+                FROM ecodriving_events
+                WHERE DATE((started_at AT TIME ZONE 'UTC') AT TIME ZONE 'Europe/Sofia')
+                      >= DATE($1::timestamptz AT TIME ZONE 'Europe/Sofia')
+                  AND DATE((started_at AT TIME ZONE 'UTC') AT TIME ZONE 'Europe/Sofia')
+                      <= DATE($2::timestamptz AT TIME ZONE 'Europe/Sofia')
+                GROUP BY driver_id, event_type
+            `;
+            const eventRes = await pool.query(eventQuery, [start, end]);
+
+            eventRes.rows.forEach(ev => {
+                const driverId = ev.driver_id;
+                const d = driverMap.get(driverId);
+                if (d) {
+                    const type = ev.event_type;
+                    const count = parseInt(ev.count);
+                    // Add to existing counts from summary records, or initialize
+                    d.events[type] = (d.events[type] || 0) + count;
                 }
             });
 
