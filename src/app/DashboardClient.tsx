@@ -743,7 +743,7 @@ export default function DashboardClient({
                                 <div className={styles.mapSection}>
                                     <LocationsMap
                                         data={mapData}
-                                        selectedLocation={selectedCountry.length > 0 ? selectedCountry[0] : null}
+                                        selectedLocation={selectedCountry}
                                         onLocationSelect={(loc) => toggleFilter('country', loc)}
                                     />
                                 </div>
@@ -751,13 +751,15 @@ export default function DashboardClient({
 
                             {chartData && chartData.length > 0 && (
                                 <div className={styles.chartsSection}>
-                                    <div className={styles.card} style={{ flex: 1 }}>
+                                    <div className={styles.card} style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
                                         <h2 className={styles.sectionTitle} style={{ marginTop: 0 }}>Warehouse Performance</h2>
-                                        <WarehouseChart
-                                            data={chartData}
-                                            selectedWarehouse={selectedWarehouse.length > 0 ? selectedWarehouse[0] : null}
-                                            onWarehouseSelect={(wh) => toggleFilter('warehouse', wh)}
-                                        />
+                                        <div style={{ flex: 1, minHeight: 0 }}>
+                                            <WarehouseChart
+                                                data={chartData}
+                                                selectedWarehouses={selectedWarehouse}
+                                                onWarehouseSelect={(wh: string) => toggleFilter('warehouse', wh)}
+                                            />
+                                        </div>
                                     </div>
                                 </div>
                             )}

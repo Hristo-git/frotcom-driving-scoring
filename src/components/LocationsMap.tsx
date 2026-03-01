@@ -63,7 +63,7 @@ interface LocationData {
 
 interface LocationsMapProps {
     data: LocationData[];
-    selectedLocation: string | null;
+    selectedLocation?: string[];
     onLocationSelect: (locationName: string) => void;
 }
 
@@ -73,7 +73,7 @@ function getColorByScore(score: number): string {
     return '#ef4444'; // Danger / Red
 }
 
-export default function LocationsMap({ data, selectedLocation, onLocationSelect }: LocationsMapProps) {
+export default function LocationsMap({ data, selectedLocation = [], onLocationSelect }: LocationsMapProps) {
     // To avoid Next.js hydration mismatch with React-Leaflet
     const [mounted, setMounted] = useState(false);
 
@@ -109,7 +109,7 @@ export default function LocationsMap({ data, selectedLocation, onLocationSelect 
                 {coordsList.length > 0 && <MapBounds locations={coordsList} />}
 
                 {validLocations.map((loc, idx) => {
-                    const isSelected = selectedLocation === loc.name;
+                    const isSelected = selectedLocation.includes(loc.name);
                     const color = getColorByScore(loc.score);
                     const radius = Math.max(10, Math.min(30, loc.driverCount * 2)); // Dynamic size based on driver count
 

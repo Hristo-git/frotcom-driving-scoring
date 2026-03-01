@@ -19,11 +19,9 @@ interface WarehouseData {
 
 interface WarehouseChartProps {
     data: WarehouseData[];
-    selectedWarehouse: string | null;
+    selectedWarehouses: string[];
     onWarehouseSelect: (warehouseName: string) => void;
 }
-
-// Custom Tooltip for Dark Theme
 const CustomTooltip = ({ active, payload, label }: any) => {
     if (active && payload && payload.length) {
         const score = payload[0].value;
@@ -51,7 +49,7 @@ const CustomTooltip = ({ active, payload, label }: any) => {
     return null;
 };
 
-export default function WarehouseChart({ data, selectedWarehouse, onWarehouseSelect }: WarehouseChartProps) {
+export default function WarehouseChart({ data, selectedWarehouses = [], onWarehouseSelect }: WarehouseChartProps) {
     // Sort data so highest scores are at the top (if we use a horizontal layout) 
     // or at the left (for vertical alignment).
     const sortedData = useMemo(() => {
@@ -66,10 +64,10 @@ export default function WarehouseChart({ data, selectedWarehouse, onWarehouseSel
         );
     }
 
-    const chartHeight = Math.max(150, sortedData.length * 45);
+    const minHeight = Math.max(150, sortedData.length * 40);
 
     return (
-        <div style={{ width: '100%', height: `${chartHeight}px` }}>
+        <div style={{ width: '100%', minHeight: `${minHeight}px`, height: '100%' }}>
             <ResponsiveContainer width="100%" height="100%">
                 <BarChart
                     data={sortedData}
@@ -106,7 +104,7 @@ export default function WarehouseChart({ data, selectedWarehouse, onWarehouseSel
                         style={{ cursor: 'pointer' }}
                     >
                         {sortedData.map((entry, index) => {
-                            const isSelected = selectedWarehouse === entry.name;
+                            const isSelected = selectedWarehouses.includes(entry.name);
 
                             // Color based on performance
                             let fill = '#ef4444'; // Low -> Red
@@ -114,7 +112,7 @@ export default function WarehouseChart({ data, selectedWarehouse, onWarehouseSel
                             else if (entry.score >= 7) fill = '#f59e0b'; // Med -> Orange
 
                             // If something is selected, dim the unselected ones
-                            if (selectedWarehouse && !isSelected) {
+                            if (selectedWarehouses.length > 0 && !isSelected) {
                                 fill = `${fill}40`; // Add transparency (hex 40 ~ 25% opacity)
                             }
 
