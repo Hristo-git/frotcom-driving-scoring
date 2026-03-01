@@ -689,10 +689,15 @@ export default function DashboardClient({
                                                             Препоръки за подобряване на представянето:
                                                         </div>
 
-                                                        {(!d.recommendations || d.recommendations.length === 0) ? (
+                                                        {d.score >= 7.0 && (!d.recommendations || d.recommendations.length === 0) ? (
                                                             <div style={{ color: '#10b981', display: 'flex', alignItems: 'center', gap: '10px', fontSize: '1.05em' }}>
                                                                 <span style={{ fontSize: '1.4em' }}>🏆</span>
                                                                 Браво! Шофирането е в отлични граници. Продължавай все така!
+                                                            </div>
+                                                        ) : (!d.recommendations || d.recommendations.length === 0) ? (
+                                                            <div style={{ color: '#94a3b8', display: 'flex', alignItems: 'center', gap: '10px', fontSize: '1.05em', fontStyle: 'italic' }}>
+                                                                <span style={{ fontSize: '1.4em' }}>📈</span>
+                                                                Продължавайте да следите показателите за още по-добри резултати.
                                                             </div>
                                                         ) : (
                                                             <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>

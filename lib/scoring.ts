@@ -297,24 +297,41 @@ export class ScoringEngine {
                 }
             });
 
-            return Array.from(driverMap.values()).map(d => ({
-                driverId: d.driver_id,
-                driverName: d.name,
-                country: d.country || 'Unknown',
-                warehouse: d.warehouse || 'Unknown',
-                countryId: d.country_id,
-                warehouseId: d.warehouse_id,
-                score: d.scoreCount > 0 ? parseFloat((d.totalScore / d.scoreCount).toFixed(2)) : 0,
-                distance: parseFloat(d.totalDistance.toFixed(1)),
-                drivingTime: Math.round(d.totalDrivingTime),
-                idling: d.count > 0 ? parseFloat((d.totalIdling / d.count).toFixed(2)) : 0,
-                consumption: d.count > 0 ? parseFloat((d.totalConsumption / d.count).toFixed(2)) : 0,
-                rpm: d.count > 0 ? parseFloat((d.totalRPM / d.count).toFixed(2)) : 0,
-                vehicles: [...d.vehicles].sort(),
-                recommendations: [...d.recommendations].sort(),
-                dataPoints: d.count,
-                events: d.events
-            })).sort((a, b) => b.score - a.score);
+            return Array.from(driverMap.values()).map(d => {
+                const avgScore = d.scoreCount > 0 ? d.totalScore / d.scoreCount : 0;
+
+                // Fallback: If no recommendations are present but score is mediocre (< 8.0),
+                // generate some based on event density (events per 100km).
+                if (d.recommendations.size === 0 && avgScore < 8.0 && d.totalDistance > 0) {
+                    const distRatio = d.totalDistance / 100;
+                    if ((d.events.lowSpeedAcceleration || 0) / distRatio > 5) d.recommendations.add('harshAccelerationLow');
+                    if ((d.events.highSpeedAcceleration || 0) / distRatio > 3) d.recommendations.add('harshAccelerationHigh');
+                    if ((d.events.lowSpeedBreak || 0) / distRatio > 5) d.recommendations.add('harshBrakingLow');
+                    if ((d.events.highSpeedBreak || 0) / distRatio > 3) d.recommendations.add('harshBrakingHigh');
+                    if ((d.events.lateralAcceleration || 0) / distRatio > 4) d.recommendations.add('sharpCornering');
+                    if ((d.events.idling || 0) / distRatio > 15) d.recommendations.add('excessiveIdling');
+                    if ((d.events.highRPM || 0) / distRatio > 5) d.recommendations.add('highRPM');
+                }
+
+                return {
+                    driverId: d.driver_id,
+                    driverName: d.name,
+                    country: d.country || 'Unknown',
+                    warehouse: d.warehouse || 'Unknown',
+                    countryId: d.country_id,
+                    warehouseId: d.warehouse_id,
+                    score: parseFloat(avgScore.toFixed(2)),
+                    distance: parseFloat(d.totalDistance.toFixed(1)),
+                    drivingTime: Math.round(d.totalDrivingTime),
+                    idling: d.scoreCount > 0 ? parseFloat((d.totalIdling / d.scoreCount).toFixed(2)) : 0,
+                    consumption: d.scoreCount > 0 ? parseFloat((d.totalConsumption / d.scoreCount).toFixed(2)) : 0,
+                    rpm: d.scoreCount > 0 ? parseFloat((d.totalRPM / d.scoreCount).toFixed(2)) : 0,
+                    vehicles: (Array.from(d.vehicles) as string[]).sort(),
+                    recommendations: (Array.from(d.recommendations) as string[]).sort(),
+                    dataPoints: d.count,
+                    events: d.events
+                };
+            }).sort((a, b) => b.score - a.score);
 
         } catch (error) {
             console.error('Error getting driver performance:', error);
