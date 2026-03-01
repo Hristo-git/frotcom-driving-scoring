@@ -29,8 +29,17 @@ export default async function DashboardPage(props: {
 
     const start = (searchParams?.start as string) || startStr;
     const end = (searchParams?.end as string) || endStr;
-    const selectedCountry = searchParams?.country as string | undefined;
-    const selectedWarehouse = searchParams?.warehouse as string | undefined;
+
+    // Parse multi-select params: can be string (single) or string[] (multiple)
+    const toArray = (val: string | string[] | undefined): string[] | undefined => {
+        if (!val) return undefined;
+        return Array.isArray(val) ? val : [val];
+    };
+
+    const selectedCountry = toArray(searchParams?.country);
+    const selectedWarehouse = toArray(searchParams?.warehouse);
+    const selectedBrand = toArray(searchParams?.brand);
+    const selectedModel = toArray(searchParams?.model);
 
     // Helper to get weight from searchParams or default
     const getW = (key: string, def: number) => {
@@ -54,10 +63,10 @@ export default async function DashboardPage(props: {
 
     // Fetch data in parallel
     const [drivers, countries, warehouses, vehicles] = await Promise.all([
-        engine.getDriverPerformance(start, end, { weights, countryName: selectedCountry, warehouseName: selectedWarehouse }),
-        engine.getCountryPerformance(start, end, { warehouseName: selectedWarehouse, weights }),
-        engine.getWarehousePerformance(start, end, weights, { countryName: selectedCountry }),
-        engine.getVehiclePerformance(start, end, { weights, countryName: selectedCountry, warehouseName: selectedWarehouse })
+        engine.getDriverPerformance(start, end, { weights, countryNames: selectedCountry, warehouseNames: selectedWarehouse }),
+        engine.getCountryPerformance(start, end, { warehouseNames: selectedWarehouse, weights }),
+        engine.getWarehousePerformance(start, end, weights, { countryNames: selectedCountry }),
+        engine.getVehiclePerformance(start, end, { weights, countryNames: selectedCountry, warehouseNames: selectedWarehouse })
     ]);
 
     // console.log(`Fetched: ${drivers.length} drivers, ${countries.length} countries, ${warehouses.length} warehouses, ${vehicles.length} vehicles`);
@@ -75,6 +84,8 @@ export default async function DashboardPage(props: {
             weights={weights}
             selectedCountry={selectedCountry}
             selectedWarehouse={selectedWarehouse}
+            selectedBrand={selectedBrand}
+            selectedModel={selectedModel}
         />
     );
 }

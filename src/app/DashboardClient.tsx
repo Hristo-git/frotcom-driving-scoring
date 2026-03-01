@@ -34,10 +34,11 @@ interface DashboardProps {
     startDate: string;
     endDate: string;
     weights: ScoringWeights;
-    selectedCountry?: string;
-    selectedWarehouse?: string;
+    selectedCountry?: string[];
+    selectedWarehouse?: string[];
+    selectedBrand?: string[];
+    selectedModel?: string[];
 }
-
 const EVENT_TRANSLATIONS: Record<string, { label: string, Icon?: React.FC }> = {
     highRPM: { label: 'Превишени обороти', Icon: IconRPM },
     lowSpeedBreak: { label: 'Рязко спиране (ниска скорост)', Icon: IconBrakeLow },
@@ -75,97 +76,68 @@ const RECOMMENDATION_TRANSLATIONS: Record<string, string> = {
 
 export default function DashboardClient({
     drivers, countries, warehouses, vehicles, startDate, endDate, weights,
-    selectedCountry, selectedWarehouse
+    selectedCountry = [], selectedWarehouse = [], selectedBrand = [], selectedModel = []
 }: DashboardProps) {
-    console.log('[DashboardClient] Props:', {
-        driverCount: drivers.length,
-        countryCount: countries.length,
-        warehouseCount: warehouses.length,
-        vehicleCount: vehicles.length,
-        startDate,
-        endDate
-    });
+    // ... [console.log omitted for brevity]
     const router = useRouter();
     const [start, setStart] = useState(startDate.split('T')[0]);
     const [end, setEnd] = useState(endDate.split('T')[0]);
     const [mode, setMode] = useState<'single' | 'range'>('range');
     const [currentWeights, setCurrentWeights] = useState<ScoringWeights>(weights);
     const [view, setView] = useState<'report' | 'settings' | 'vehicles' | 'drivers'>('report');
-    const [selectedBrand, setSelectedBrand] = useState<string | null>(null);
-    const [selectedModel, setSelectedModel] = useState<string | null>(null);
+
     const [expandedDriver, setExpandedDriver] = useState<number | null>(null);
     const [driverSortField, setDriverSortField] = useState<string>('score');
     const [driverSortOrder, setDriverSortOrder] = useState<'asc' | 'desc'>('desc');
-
-    React.useEffect(() => {
-        setStart(startDate.split('T')[0]);
-        setEnd(endDate.split('T')[0]);
-        setCurrentWeights(weights);
-    }, [startDate, endDate, weights]);
-
-    // Reset children filters when parent changes
-    const handleCountryClick = (name: string) => {
-        if (selectedCountry === name) {
-            removeFilter('country');
-        } else {
-            handleFilterClick('country', name);
-        }
-        setSelectedBrand(null);
-        setSelectedModel(null);
-    };
-
-    const handleBrandClick = (name: string | null) => {
-        setSelectedBrand(name);
-        setSelectedModel(null);
-    };
 
     const handleApplyFilter = () => {
         const params = new URLSearchParams();
         params.set('start', `${start}T00:00:00.000Z`);
         params.set('end', `${end}T23:59:59.999Z`);
 
-        if (selectedCountry) params.set('country', selectedCountry);
-        if (selectedWarehouse) params.set('warehouse', selectedWarehouse);
+        selectedCountry.forEach(c => params.append('country', c));
+        selectedWarehouse.forEach(w => params.append('warehouse', w));
+        selectedBrand.forEach(b => params.append('brand', b));
+        selectedModel.forEach(m => params.append('model', m));
 
-        params.set('hal', currentWeights.harshAccelerationLow.toString());
-        params.set('hah', currentWeights.harshAccelerationHigh.toString());
-        params.set('hbl', currentWeights.harshBrakingLow.toString());
-        params.set('hbh', currentWeights.harshBrakingHigh.toString());
-        params.set('hc', currentWeights.harshCornering.toString());
-        params.set('abs', currentWeights.accelBrakeSwitch.toString());
-        params.set('ei', currentWeights.excessiveIdling.toString());
-        params.set('hr', currentWeights.highRPM.toString());
-        params.set('al', currentWeights.alarms.toString());
-        params.set('ncc', currentWeights.noCruiseControl.toString());
-        params.set('adc', currentWeights.accelDuringCruise.toString());
+        // Add weights
+        Object.entries(currentWeights).forEach(([key, val]) => {
+            const shortKey = {
+                harshAccelerationLow: 'hal', harshAccelerationHigh: 'hah',
+                harshBrakingLow: 'hbl', harshBrakingHigh: 'hbh',
+                harshCornering: 'hc', accelBrakeSwitch: 'abs',
+                excessiveIdling: 'ei', highRPM: 'hr',
+                alarms: 'al', noCruiseControl: 'ncc',
+                accelDuringCruise: 'adc'
+            }[key];
+            if (shortKey) params.set(shortKey, val.toString());
+        });
 
         router.push(`/?${params.toString()}`);
         if (view === 'settings') setView('report');
     };
 
-    const handleFilterClick = (type: 'country' | 'warehouse', value: string) => {
+    const toggleFilter = (type: 'country' | 'warehouse' | 'brand' | 'model', value: string) => {
         const params = new URLSearchParams(window.location.search);
+        const currentValues = params.getAll(type);
 
-        if (type === 'country') {
-            if (selectedCountry === value) {
-                params.delete('country');
-                params.delete('warehouse');
-            } else {
-                params.set('country', value);
-                params.delete('warehouse');
-            }
+        if (currentValues.includes(value)) {
+            // Remove
+            const newValues = currentValues.filter(v => v !== value);
+            params.delete(type);
+            newValues.forEach(v => params.append(type, v));
+            // If country removed, also clear warehouses
+            if (type === 'country') params.delete('warehouse');
         } else {
-            if (selectedWarehouse === value) {
-                params.delete('warehouse');
-            } else {
-                params.set('warehouse', value);
-            }
+            // Add
+            params.append(type, value);
+            // If country added, we don't necessarily clear warehouses, as it's multi-select now
         }
 
         router.push(`/?${params.toString()}`);
     };
 
-    const removeFilter = (type: 'country' | 'warehouse') => {
+    const removeFilter = (type: 'country' | 'warehouse' | 'brand' | 'model') => {
         const params = new URLSearchParams(window.location.search);
         params.delete(type);
         if (type === 'country') params.delete('warehouse');
@@ -264,16 +236,16 @@ export default function DashboardClient({
         .filter(Boolean)
         .sort();
 
-    // 2. Available models depend on selected country AND brand
+    // 2. Available models depend on selected country AND selected brands
     const availableModels = Array.from(new Set(
         availableVehicles
-            .filter(v => !selectedBrand || v.manufacturer === selectedBrand)
+            .filter(v => selectedBrand.length === 0 || selectedBrand.includes(v.manufacturer))
             .map(v => v.model)
     )).filter(Boolean).sort();
 
     const filteredVehicles = availableVehicles.filter(v => {
-        if (selectedBrand && v.manufacturer !== selectedBrand) return false;
-        if (selectedModel && v.model !== selectedModel) return false;
+        if (selectedBrand.length > 0 && !selectedBrand.includes(v.manufacturer)) return false;
+        if (selectedModel.length > 0 && !selectedModel.includes(v.model)) return false;
         return true;
     });
 
@@ -521,14 +493,14 @@ export default function DashboardClient({
                             <div className={styles.filterLabel}>Град</div>
                             <div className={styles.filterTileContainer}>
                                 <div
-                                    className={`${styles.filterTile} ${!selectedCountry ? styles.filterTileActive : ''}`}
+                                    className={`${styles.filterTile} ${selectedCountry.length === 0 ? styles.filterTileActive : ''}`}
                                     onClick={() => removeFilter('country')}
                                 >Всички</div>
                                 {countries.map(c => (
                                     <div
                                         key={c.name}
-                                        className={`${styles.filterTile} ${selectedCountry === c.name ? styles.filterTileActive : ''}`}
-                                        onClick={() => handleCountryClick(c.name)}
+                                        className={`${styles.filterTile} ${selectedCountry.includes(c.name) ? styles.filterTileActive : ''}`}
+                                        onClick={() => toggleFilter('country', c.name)}
                                     >{c.name}</div>
                                 ))}
                             </div>
@@ -539,38 +511,36 @@ export default function DashboardClient({
                             <div className={styles.filterLabel}>Марка</div>
                             <div className={styles.filterTileContainer}>
                                 <div
-                                    className={`${styles.filterTile} ${!selectedBrand ? styles.filterTileActive : ''}`}
-                                    onClick={() => handleBrandClick(null)}
+                                    className={`${styles.filterTile} ${selectedBrand.length === 0 ? styles.filterTileActive : ''}`}
+                                    onClick={() => removeFilter('brand')}
                                 >Всички</div>
                                 {brands.map(b => (
                                     <div
                                         key={b}
-                                        className={`${styles.filterTile} ${selectedBrand === b ? styles.filterTileActive : ''}`}
-                                        onClick={() => handleBrandClick(b)}
+                                        className={`${styles.filterTile} ${selectedBrand.includes(b) ? styles.filterTileActive : ''}`}
+                                        onClick={() => toggleFilter('brand', b)}
                                     >{b}</div>
                                 ))}
                             </div>
                         </div>
 
                         {/* 3. Model Filter as Chained Tiles */}
-                        {(selectedBrand || selectedModel) && (
-                            <div className={styles.filterGroup}>
-                                <div className={styles.filterLabel}>Модел</div>
-                                <div className={styles.filterTileContainer}>
+                        <div className={styles.filterGroup}>
+                            <div className={styles.filterLabel}>Модел</div>
+                            <div className={styles.filterTileContainer}>
+                                <div
+                                    className={`${styles.filterTile} ${selectedModel.length === 0 ? styles.filterTileActive : ''}`}
+                                    onClick={() => removeFilter('model')}
+                                >Всички</div>
+                                {availableModels.map(m => (
                                     <div
-                                        className={`${styles.filterTile} ${!selectedModel ? styles.filterTileActive : ''}`}
-                                        onClick={() => setSelectedModel(null)}
-                                    >Всички</div>
-                                    {availableModels.map(m => (
-                                        <div
-                                            key={m}
-                                            className={`${styles.filterTile} ${selectedModel === m ? styles.filterTileActive : ''}`}
-                                            onClick={() => setSelectedModel(m)}
-                                        >{m}</div>
-                                    ))}
-                                </div>
+                                        key={m}
+                                        className={`${styles.filterTile} ${selectedModel.includes(m) ? styles.filterTileActive : ''}`}
+                                        onClick={() => toggleFilter('model', m)}
+                                    >{m}</div>
+                                ))}
                             </div>
-                        )}
+                        </div>
                     </div>
 
                     <div className={styles.tableContainer} style={{ maxHeight: '70vh', overflowY: 'auto' }}>
@@ -773,8 +743,8 @@ export default function DashboardClient({
                                 <div className={styles.mapSection}>
                                     <LocationsMap
                                         data={mapData}
-                                        selectedLocation={selectedCountry || null}
-                                        onLocationSelect={(loc) => handleFilterClick('country', loc)}
+                                        selectedLocation={selectedCountry.length > 0 ? selectedCountry[0] : null}
+                                        onLocationSelect={(loc) => toggleFilter('country', loc)}
                                     />
                                 </div>
                             )}
@@ -785,8 +755,8 @@ export default function DashboardClient({
                                         <h2 className={styles.sectionTitle} style={{ marginTop: 0 }}>Warehouse Performance</h2>
                                         <WarehouseChart
                                             data={chartData}
-                                            selectedWarehouse={selectedWarehouse || null}
-                                            onWarehouseSelect={(wh) => handleFilterClick('warehouse', wh)}
+                                            selectedWarehouse={selectedWarehouse.length > 0 ? selectedWarehouse[0] : null}
+                                            onWarehouseSelect={(wh) => toggleFilter('warehouse', wh)}
                                         />
                                     </div>
                                 </div>

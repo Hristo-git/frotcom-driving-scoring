@@ -164,7 +164,7 @@ export class ScoringEngine {
         );
     }
 
-    async getDriverPerformance(start: string, end: string, options?: { countryName?: string, warehouseName?: string, weights?: ScoringWeights }): Promise<PerformanceReport[]> {
+    async getDriverPerformance(start: string, end: string, options?: { countryNames?: string[], warehouseNames?: string[], weights?: ScoringWeights }): Promise<PerformanceReport[]> {
         // Records are stored with period_start = Sofia midnight expressed as UTC (e.g. 2026-02-17T22:00Z
         // for Sofia date 2026-02-18). We compare calendar dates in Sofia timezone to avoid missing records
         // when the caller passes UTC midnight (e.g. 2026-02-18T00:00Z).
@@ -187,15 +187,15 @@ export class ScoringEngine {
         const params: any[] = [start, end];
         let paramIdx = 3;
 
-        if (options?.countryName) {
-            query += ` AND c.name = $${paramIdx}`;
-            params.push(options.countryName);
+        if (options?.countryNames && options.countryNames.length > 0) {
+            query += ` AND c.name = ANY($${paramIdx}::text[])`;
+            params.push(options.countryNames);
             paramIdx++;
         }
 
-        if (options?.warehouseName) {
-            query += ` AND w.name = $${paramIdx}`;
-            params.push(options.warehouseName);
+        if (options?.warehouseNames && options.warehouseNames.length > 0) {
+            query += ` AND w.name = ANY($${paramIdx}::text[])`;
+            params.push(options.warehouseNames);
             paramIdx++;
         }
 
@@ -339,10 +339,10 @@ export class ScoringEngine {
         }
     }
 
-    async getCountryPerformance(start: string, end: string, options?: { warehouseName?: string, weights?: ScoringWeights }): Promise<AggregatedPerformance[]> {
+    async getCountryPerformance(start: string, end: string, options?: { warehouseNames?: string[], weights?: ScoringWeights }): Promise<AggregatedPerformance[]> {
         // We always get all drivers to aggregate countries, ignoring the country filter for the country list itself
         // but we support a warehouse filter to see country performance for a specific warehouse
-        const drivers = await this.getDriverPerformance(start, end, { warehouseName: options?.warehouseName, weights: options?.weights });
+        const drivers = await this.getDriverPerformance(start, end, { warehouseNames: options?.warehouseNames, weights: options?.weights });
         const countryMap = new Map<string, any>();
 
         drivers.forEach(d => {
@@ -363,9 +363,9 @@ export class ScoringEngine {
         })).sort((a, b) => b.score - a.score);
     }
 
-    async getWarehousePerformance(start: string, end: string, weights?: ScoringWeights, options?: { countryName?: string }): Promise<AggregatedPerformance[]> {
+    async getWarehousePerformance(start: string, end: string, weights?: ScoringWeights, options?: { countryNames?: string[] }): Promise<AggregatedPerformance[]> {
         // Warehouse performance can be filtered by country
-        const drivers = await this.getDriverPerformance(start, end, { weights, countryName: options?.countryName });
+        const drivers = await this.getDriverPerformance(start, end, { weights, countryNames: options?.countryNames });
         const warehouseMap = new Map<string, any>();
 
         drivers.forEach(d => {
@@ -386,7 +386,7 @@ export class ScoringEngine {
         })).sort((a, b) => b.score - a.score);
     }
 
-    async getVehiclePerformance(start: string, end: string, options?: { countryName?: string, warehouseName?: string, weights?: ScoringWeights }): Promise<VehiclePerformance[]> {
+    async getVehiclePerformance(start: string, end: string, options?: { countryNames?: string[], warehouseNames?: string[], weights?: ScoringWeights }): Promise<VehiclePerformance[]> {
         // We calculate vehicle performance by re-aggregating the driver periods 
         // that hit specific vehicles, doing this via the DB jsonb_array_elements.
 
@@ -416,15 +416,15 @@ export class ScoringEngine {
         const params: any[] = [start, end];
         let paramIdx = 3;
 
-        if (options?.countryName) {
-            query += ` AND c.name = $${paramIdx}`;
-            params.push(options.countryName);
+        if (options?.countryNames && options.countryNames.length > 0) {
+            query += ` AND c.name = ANY($${paramIdx}::text[])`;
+            params.push(options.countryNames);
             paramIdx++;
         }
 
-        if (options?.warehouseName) {
-            query += ` AND w.name = $${paramIdx}`;
-            params.push(options.warehouseName);
+        if (options?.warehouseNames && options.warehouseNames.length > 0) {
+            query += ` AND w.name = ANY($${paramIdx}::text[])`;
+            params.push(options.warehouseNames);
             paramIdx++;
         }
 
