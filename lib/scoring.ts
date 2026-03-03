@@ -50,17 +50,17 @@ export interface VehiclePerformance {
 }
 
 export const DEFAULT_WEIGHTS: ScoringWeights = {
-    harshAccelerationLow: 0.15,
-    harshAccelerationHigh: 0.25,
-    harshBrakingLow: 0.15,
-    harshBrakingHigh: 0.25,
-    harshCornering: 0.20,
-    accelBrakeSwitch: 0.10,
-    excessiveIdling: 0.15,
+    harshAccelerationLow: 90.0,
+    harshAccelerationHigh: 75.0,
+    harshBrakingLow: 65.0,
+    harshBrakingHigh: 75.0,
+    harshCornering: 70.0,
+    accelBrakeSwitch: 0.1,
+    excessiveIdling: 20.0,
     highRPM: 0.15,
-    alarms: 0.10,
-    noCruiseControl: 0.10,
-    accelDuringCruise: 0.10
+    alarms: 0.1,
+    noCruiseControl: 0.1,
+    accelDuringCruise: 0.1
 };
 
 export const RECOMMENDATION_LABELS: Record<number, string> = {
@@ -79,24 +79,36 @@ export const RECOMMENDATION_LABELS: Record<number, string> = {
 
 export class ScoringEngine {
     private calculateCustomScore(metrics: any, weights: ScoringWeights): number {
-        let score = 10.0;
         const dist = parseFloat(metrics.mileage) || 0;
         if (dist < 0.1) return 10.0;
 
+        // Sum weights for normalization
+        const sumWeights = Object.values(weights).reduce((a, b) => a + b, 0);
+        if (sumWeights === 0) return 10.0;
+
+        let score = 10.0;
         const distRatio = dist / 100;
         const counts = metrics.eventCounts || {};
 
-        if (counts.lowSpeedAcceleration) score -= (counts.lowSpeedAcceleration / distRatio) * weights.harshAccelerationLow * 0.5;
-        if (counts.highSpeedAcceleration) score -= (counts.highSpeedAcceleration / distRatio) * weights.harshAccelerationHigh * 0.8;
-        if (counts.lowSpeedBreak) score -= (counts.lowSpeedBreak / distRatio) * weights.harshBrakingLow * 0.5;
-        if (counts.highSpeedBreak) score -= (counts.highSpeedBreak / distRatio) * weights.harshBrakingHigh * 0.8;
-        if (counts.lateralAcceleration) score -= (counts.lateralAcceleration / distRatio) * weights.harshCornering * 0.6;
+        // Normalization factor (Frotcom uses normalized weights)
+        const nf = (w: number) => w / sumWeights;
 
+        // Penalty = (Events / DistRatio) * NormalizedWeight * K
+        // Using approximate K=0.015 based on typical Frotcom scaling
+        const K = 0.015;
+
+        if (counts.lowSpeedAcceleration) score -= (counts.lowSpeedAcceleration / distRatio) * nf(weights.harshAccelerationLow) * K * 10;
+        if (counts.highSpeedAcceleration) score -= (counts.highSpeedAcceleration / distRatio) * nf(weights.harshAccelerationHigh) * K * 15;
+        if (counts.lowSpeedBreak) score -= (counts.lowSpeedBreak / distRatio) * nf(weights.harshBrakingLow) * K * 10;
+        if (counts.highSpeedBreak) score -= (counts.highSpeedBreak / distRatio) * nf(weights.harshBrakingHigh) * K * 15;
+        if (counts.lateralAcceleration) score -= (counts.lateralAcceleration / distRatio) * nf(weights.harshCornering) * K * 12;
+
+        // Time-based metrics
         const idlePerc = parseFloat(metrics.idleTimePerc) || 0;
-        if (idlePerc > 10) score -= (idlePerc - 10) * weights.excessiveIdling * 0.1;
+        if (idlePerc > 10) score -= (idlePerc - 10) * nf(weights.excessiveIdling) * 0.5;
 
         const rpmPerc = parseFloat(metrics.highRPMPerc) || 0;
-        if (rpmPerc > 5) score -= (rpmPerc - 5) * weights.highRPM * 0.1;
+        if (rpmPerc > 5) score -= (rpmPerc - 5) * nf(weights.highRPM) * 0.2;
 
         return Math.max(0, Math.min(10, score));
     }
@@ -185,6 +197,8 @@ export class ScoringEngine {
                 }
 
                 const d = driverMap.get(driverId);
+                // We revert to 1km threshold because excluding all < 70km days caused larger discrepancies.
+                // It seems Frotcom includes the impact of low mileage days in its period aggregation.
                 const isWeightable = !(score === 0 && (row.metrics.hasLowMileage || distance < 1.0)) && distance > 0;
 
                 if (isWeightable) {
