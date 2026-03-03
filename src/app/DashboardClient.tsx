@@ -102,15 +102,15 @@ export default function DashboardClient({
 
         // Add weights
         Object.entries(currentWeights).forEach(([key, val]) => {
-            const shortKey = {
+            const shortKey = ({
                 harshAccelerationLow: 'hal', harshAccelerationHigh: 'hah',
                 harshBrakingLow: 'hbl', harshBrakingHigh: 'hbh',
                 harshCornering: 'hc', accelBrakeSwitch: 'abs',
                 excessiveIdling: 'ei', highRPM: 'hr',
                 alarms: 'al', noCruiseControl: 'ncc',
                 accelDuringCruise: 'adc'
-            }[key];
-            if (shortKey) params.set(shortKey, val.toString());
+            } as any)[key];
+            if (shortKey) params.set(shortKey, (val as number).toString());
         });
 
         router.push(`/?${params.toString()}`);
@@ -158,16 +158,17 @@ export default function DashboardClient({
         return driverSortOrder === 'asc' ? '↑' : '↓';
     };
 
-    const overallScore = drivers.length > 0
-        ? (drivers.reduce((acc, d) => acc + d.score, 0) / drivers.length).toFixed(2)
+    const totalDistance = drivers.reduce((acc, d) => acc + (d.distance || 0), 0);
+    const overallScore = totalDistance > 0
+        ? (drivers.reduce((acc, d) => acc + (d.score * (d.distance || 0)), 0) / totalDistance).toFixed(2)
         : '0.00';
 
-    const totalDistance = drivers.reduce((acc, d) => acc + (d.distance || 0), 0);
     const activeDrivers = drivers.length;
 
     const activeDriversWithConsumption = drivers.filter(d => d.consumption > 0);
-    const avgConsumption = activeDriversWithConsumption.length > 0
-        ? (activeDriversWithConsumption.reduce((acc, d) => acc + d.consumption, 0) / activeDriversWithConsumption.length).toFixed(1)
+    const totalDistanceForConsumption = activeDriversWithConsumption.reduce((acc, d) => acc + (d.distance || 0), 0);
+    const avgConsumption = totalDistanceForConsumption > 0
+        ? (activeDriversWithConsumption.reduce((acc, d) => acc + (d.consumption * (d.distance || 0)), 0) / totalDistanceForConsumption).toFixed(1)
         : '0.0';
 
     const getScoreClass = (score: number) => {
@@ -671,7 +672,7 @@ export default function DashboardClient({
                                                             </div>
                                                         ) : (
                                                             <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                                                                {d.recommendations.map((rec, i) => (
+                                                                {d.recommendations.map((rec: string, i: number) => (
                                                                     <div key={i} style={{
                                                                         display: 'flex',
                                                                         alignItems: 'center',

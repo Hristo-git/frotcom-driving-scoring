@@ -12,7 +12,7 @@ const pool = new Pool({
 
 async function searchDriver() {
     try {
-        const res = await pool.query("SELECT id, name, frotcom_id FROM drivers WHERE name ILIKE '%Miroslav%' OR name ILIKE '%Мирослав%'");
+        const res = await pool.query("SELECT id, name, frotcom_id FROM drivers WHERE name ILIKE '%Kostadin%' OR name ILIKE '%Костадин%'");
         console.log('Search results:');
         console.table(res.rows);
     } catch (err) {

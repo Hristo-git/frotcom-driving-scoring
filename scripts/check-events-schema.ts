@@ -1,24 +1,20 @@
 
-import { Pool } from 'pg';
-import * as dotenv from 'dotenv';
-dotenv.config({ path: '.env.local' });
-const pool = new Pool({
-    connectionString: process.env.DATABASE_URL,
-    ssl: { rejectUnauthorized: false }
-});
-async function checkEventsSchema() {
+import pool from '../lib/db';
+import dotenv from 'dotenv';
+import path from 'path';
+
+dotenv.config({ path: path.resolve(process.cwd(), '.env.local') });
+
+async function checkSchema() {
     try {
-        const res = await pool.query(`
-            SELECT column_name, data_type 
-            FROM information_schema.columns 
-            WHERE table_name = 'ecodriving_events'
-            ORDER BY ordinal_position
-        `);
-        console.table(res.rows);
-    } catch (err) {
-        console.error(err);
+        const res = await pool.query(
+            `SELECT column_name FROM information_schema.columns WHERE table_name = 'ecodriving_events'`
+        );
+        console.log("Columns:", res.rows.map(r => r.column_name));
+    } catch (err: any) {
+        console.error(err.message);
     } finally {
         await pool.end();
     }
 }
-checkEventsSchema();
+checkSchema();

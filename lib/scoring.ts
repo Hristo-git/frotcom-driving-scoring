@@ -1,10 +1,5 @@
 
 import pool from './db';
-import dotenv from 'dotenv';
-import path from 'path';
-
-dotenv.config({ path: path.resolve(process.cwd(), '.env.local') });
-
 export interface ScoringWeights {
     harshAccelerationLow: number;
     harshAccelerationHigh: number;
@@ -19,40 +14,6 @@ export interface ScoringWeights {
     accelDuringCruise: number;
 }
 
-export const DEFAULT_WEIGHTS: ScoringWeights = {
-    harshAccelerationLow: 90,   // Резки ускорения при ниска скорост
-    harshAccelerationHigh: 75,   // Резки ускорения при висока скорост
-    harshBrakingLow: 65,   // Резки спирания при ниска скорост
-    harshBrakingHigh: 75,   // Резки спирания при висока скорост
-    harshCornering: 70,   // Рязък завой
-    accelBrakeSwitch: 0,   // Рязка смяна ускорение/спирачка
-    excessiveIdling: 20,   // Превишена работа на място
-    highRPM: 0,   // Превишени обороти
-    alarms: 0,   // Аларми
-    noCruiseControl: 0,   // Без круиз контрол
-    accelDuringCruise: 0,   // Ускорение при круиз контрол
-};
-
-/**
- * Maps Frotcom recommendation IDs → human-readable criteria names.
- * Used for legacy data support where recommendations were stored as numeric IDs.
- */
-export const RECOMMENDATION_LABELS: Record<number, string> = {
-    1: 'harshAccelerationLow',
-    2: 'harshAccelerationHigh',
-    3: 'harshBrakingLow',
-    4: 'harshBrakingHigh',
-    5: 'sharpCornering',
-    6: 'suddenBrakeThrottleChange',
-    7: 'excessiveIdling',
-    8: 'highRPM',
-    9: 'alarms',
-    10: 'timeWithoutCruiseControl',
-    11: 'accelerationOnCruiseControl',
-    12: 'criterion12',
-    13: 'criterion13',
-};
-
 export interface PerformanceReport {
     driverId: number;
     driverName: string;
@@ -62,19 +23,17 @@ export interface PerformanceReport {
     warehouseId?: number;
     score: number;
     distance: number;
-    drivingTime: number;   // total seconds
+    drivingTime: number;
     idling: number;
     consumption: number;
     rpm: number;
-    vehicles: string[];    // license plates driven in this period
-    recommendations: string[]; // failing criteria/recommendations
+    vehicles: string[];
+    recommendations: string[];
     dataPoints: number;
     events: Record<string, number>;
-    eventCounts?: Record<string, number>;
 }
 
 export interface AggregatedPerformance {
-    id?: number;
     name: string;
     score: number;
     driversCount: number;
@@ -90,61 +49,62 @@ export interface VehiclePerformance {
     fuelConsumption: number;
 }
 
+export const DEFAULT_WEIGHTS: ScoringWeights = {
+    harshAccelerationLow: 0.15,
+    harshAccelerationHigh: 0.25,
+    harshBrakingLow: 0.15,
+    harshBrakingHigh: 0.25,
+    harshCornering: 0.20,
+    accelBrakeSwitch: 0.10,
+    excessiveIdling: 0.15,
+    highRPM: 0.15,
+    alarms: 0.10,
+    noCruiseControl: 0.10,
+    accelDuringCruise: 0.10
+};
+
+export const RECOMMENDATION_LABELS: Record<number, string> = {
+    1: 'harshAccelerationLow',
+    2: 'harshAccelerationHigh',
+    3: 'harshBrakingLow',
+    4: 'harshBrakingHigh',
+    5: 'sharpCornering',
+    6: 'accelBrakeSwitch',
+    7: 'excessiveIdling',
+    8: 'highRPM',
+    9: 'safetyAlarms',
+    10: 'noCruiseControl',
+    11: 'accelDuringCruise'
+};
+
 export class ScoringEngine {
-
     private calculateCustomScore(metrics: any, weights: ScoringWeights): number {
-        // Frotcom's own score is the authoritative value — it accounts for all 6 ecodriving
-        // criteria (harsh accel/braking, cornering, excessive idling, RPM) using their exact thresholds.
-        const baseScore = parseFloat(metrics.score) || 0;
+        // If the report already has an overall_score and weights are default, use it
+        // Otherwise, re-calculate based on event counts and weights
 
-        // When using default weights, pass Frotcom's score through directly.
-        // This matches the Frotcom UI exactly and avoids approximation errors.
-        if (this.weightsAreDefault(weights)) {
-            return baseScore;
-        }
+        let score = 10.0;
+        const dist = parseFloat(metrics.mileage) || 0;
+        if (dist < 0.1) return 10.0; // Perfect score for no/low distance
 
-        // --- Custom weights mode ---
-        // idleTimePerc = total idle/driving time ratio (includes ALL standstill: traffic,
-        // loading, etc.) — NOT just threshold-based excessive idling that Frotcom scores.
-        // We treat it as an approximation.
-        const idleRaw = metrics.idleTimePerc;
-        const idlingVal = (idleRaw !== null && idleRaw !== undefined) ? parseFloat(idleRaw) : NaN;
-        const idlingAvailable = !isNaN(idlingVal);
-        // 0% → 10pts, 100% → 0pts
-        const idlingScore = idlingAvailable ? Math.max(0, 10 - (idlingVal / 10)) : null;
+        const distRatio = dist / 100;
+        const counts = metrics.eventCounts || {};
 
-        // highRPMPerc is null when the vehicle has no RPM sensor ("Не е достъпен").
-        // Never default to 0 — that gives an artificially perfect score.
-        const rpmRaw = metrics.highRPMPerc;
-        const rpmVal = (rpmRaw !== null && rpmRaw !== undefined) ? parseFloat(rpmRaw) : NaN;
-        const rpmAvailable = !isNaN(rpmVal);
-        const rpmScore = rpmAvailable ? Math.max(0, 10 - (rpmVal / 10)) : null;
+        // Example penalty logic based on Frotcom defaults
+        // (Simplified placeholder until exact formulas are confirmed)
+        if (counts.lowSpeedAcceleration) score -= (counts.lowSpeedAcceleration / distRatio) * weights.harshAccelerationLow * 0.5;
+        if (counts.highSpeedAcceleration) score -= (counts.highSpeedAcceleration / distRatio) * weights.harshAccelerationHigh * 0.8;
+        if (counts.lowSpeedBreak) score -= (counts.lowSpeedBreak / distRatio) * weights.harshBrakingLow * 0.5;
+        if (counts.highSpeedBreak) score -= (counts.highSpeedBreak / distRatio) * weights.harshBrakingHigh * 0.8;
+        if (counts.lateralAcceleration) score -= (counts.lateralAcceleration / distRatio) * weights.harshCornering * 0.6;
 
-        // Effective weight total — exclude criteria with no data
-        let totalWeight = Object.values(weights).reduce((a, b) => a + b, 0);
-        if (!idlingAvailable) totalWeight -= weights.excessiveIdling;
-        if (!rpmAvailable) totalWeight -= weights.highRPM;
-        if (totalWeight === 0) return baseScore;
+        // Time-based metrics
+        const idlePerc = parseFloat(metrics.idleTimePerc) || 0;
+        if (idlePerc > 10) score -= (idlePerc - 10) * weights.excessiveIdling * 0.1;
 
-        let weightedSum = 0;
-        if (idlingAvailable && idlingScore !== null) {
-            weightedSum += idlingScore * weights.excessiveIdling;
-        }
-        if (rpmAvailable && rpmScore !== null) {
-            weightedSum += rpmScore * weights.highRPM;
-        }
+        const rpmPerc = parseFloat(metrics.highRPMPerc) || 0;
+        if (rpmPerc > 5) score -= (rpmPerc - 5) * weights.highRPM * 0.1;
 
-        // All other criteria use Frotcom's overall score as a proxy until individual
-        // sub-scores (harsh accel count, braking count, etc.) are stored from the API.
-        const placeholderCriteria: (keyof ScoringWeights)[] = [
-            'harshAccelerationLow', 'harshAccelerationHigh', 'harshBrakingLow', 'harshBrakingHigh',
-            'harshCornering', 'accelBrakeSwitch', 'alarms', 'noCruiseControl', 'accelDuringCruise'
-        ];
-        placeholderCriteria.forEach(c => {
-            weightedSum += baseScore * weights[c];
-        });
-
-        return weightedSum / totalWeight;
+        return Math.max(0, Math.min(10, score));
     }
 
     private weightsAreDefault(weights: ScoringWeights): boolean {
@@ -165,9 +125,6 @@ export class ScoringEngine {
     }
 
     async getDriverPerformance(start: string, end: string, options?: { countryNames?: string[], warehouseNames?: string[], weights?: ScoringWeights }): Promise<PerformanceReport[]> {
-        // Records are stored with period_start = Sofia midnight expressed as UTC (e.g. 2026-02-17T22:00Z
-        // for Sofia date 2026-02-18). We compare calendar dates in Sofia timezone to avoid missing records
-        // when the caller passes UTC midnight (e.g. 2026-02-18T00:00Z).
         let query = `
             SELECT 
                 d.id as driver_id, d.name, c.name as country, w.name as warehouse,
@@ -203,8 +160,6 @@ export class ScoringEngine {
 
         try {
             const res = await pool.query(query, params);
-
-            // Group by driver manually to handle custom weighting per record
             const driverMap = new Map<number, any>();
 
             res.rows.forEach(row => {
@@ -220,13 +175,13 @@ export class ScoringEngine {
                 if (!driverMap.has(driverId)) {
                     driverMap.set(driverId, {
                         ...row,
-                        totalScore: 0,
-                        scoreCount: 0,
+                        totalWeightedScore: 0,
+                        totalDistanceForWeights: 0,
                         totalDistance: 0,
                         totalDrivingTime: 0,
-                        totalIdling: 0,
-                        totalConsumption: 0,
-                        totalRPM: 0,
+                        totalIdlingWeighted: 0,
+                        totalConsumptionWeighted: 0,
+                        totalRPMWeighted: 0,
                         vehicles: new Set<string>(),
                         recommendations: new Set<string>(),
                         events: {} as Record<string, number>,
@@ -235,16 +190,14 @@ export class ScoringEngine {
                 }
 
                 const d = driverMap.get(driverId);
+                const isWeightable = !(score === 0 && row.metrics.hasLowMileage) && distance > 0;
 
-                // Exclude low-mileage days with 0 score from the averages as they are usually data artifacts
-                const isSkippedForAverage = score === 0 && row.metrics.hasLowMileage;
-
-                if (!isSkippedForAverage) {
-                    d.totalScore += score;
-                    d.scoreCount++;
-                    d.totalIdling += idling;
-                    d.totalConsumption += consumption;
-                    d.totalRPM += rpm;
+                if (isWeightable) {
+                    d.totalWeightedScore += score * distance;
+                    d.totalIdlingWeighted += idling * distance;
+                    d.totalConsumptionWeighted += consumption * distance;
+                    d.totalRPMWeighted += rpm * distance;
+                    d.totalDistanceForWeights += distance;
                     d.count++;
                 }
 
@@ -256,7 +209,6 @@ export class ScoringEngine {
                     row.metrics.failingCriteria.forEach((crit: string) => d.recommendations.add(crit));
                 }
 
-                // Support legacy recommendations (numeric IDs)
                 if (Array.isArray(row.metrics.recommendations)) {
                     row.metrics.recommendations.forEach((id: number) => {
                         const label = RECOMMENDATION_LABELS[id];
@@ -271,9 +223,7 @@ export class ScoringEngine {
                 }
             });
 
-            // --- NEW: Atomic fetch of granular events from ecodriving_events ---
-            // This ensures data from the manual sync (which stores into ecodriving_events)
-            // is reflected in the dashboard even if not yet in ecodriving_scores' metrics.
+            // Fetch granular events
             const eventQuery = `
                 SELECT 
                     driver_id, event_type, COUNT(*) as count
@@ -292,16 +242,13 @@ export class ScoringEngine {
                 if (d) {
                     const type = ev.event_type;
                     const count = parseInt(ev.count);
-                    // Add to existing counts from summary records, or initialize
                     d.events[type] = (d.events[type] || 0) + count;
                 }
             });
 
             return Array.from(driverMap.values()).map(d => {
-                const avgScore = d.scoreCount > 0 ? d.totalScore / d.scoreCount : 0;
+                const avgScore = d.totalDistanceForWeights > 0 ? d.totalWeightedScore / d.totalDistanceForWeights : 0;
 
-                // Fallback: If no recommendations are present but score is mediocre (< 8.0),
-                // generate some based on event density (events per 100km).
                 if (d.recommendations.size === 0 && avgScore < 8.0 && d.totalDistance > 0) {
                     const distRatio = d.totalDistance / 100;
                     if ((d.events.lowSpeedAcceleration || 0) / distRatio > 5) d.recommendations.add('harshAccelerationLow');
@@ -323,16 +270,15 @@ export class ScoringEngine {
                     score: parseFloat(avgScore.toFixed(2)),
                     distance: parseFloat(d.totalDistance.toFixed(1)),
                     drivingTime: Math.round(d.totalDrivingTime),
-                    idling: d.scoreCount > 0 ? parseFloat((d.totalIdling / d.scoreCount).toFixed(2)) : 0,
-                    consumption: d.scoreCount > 0 ? parseFloat((d.totalConsumption / d.scoreCount).toFixed(2)) : 0,
-                    rpm: d.scoreCount > 0 ? parseFloat((d.totalRPM / d.scoreCount).toFixed(2)) : 0,
+                    idling: d.totalDistanceForWeights > 0 ? parseFloat((d.totalIdlingWeighted / d.totalDistanceForWeights).toFixed(2)) : 0,
+                    consumption: d.totalDistanceForWeights > 0 ? parseFloat((d.totalConsumptionWeighted / d.totalDistanceForWeights).toFixed(2)) : 0,
+                    rpm: d.totalDistanceForWeights > 0 ? parseFloat((d.totalRPMWeighted / d.totalDistanceForWeights).toFixed(2)) : 0,
                     vehicles: (Array.from(d.vehicles) as string[]).sort(),
                     recommendations: (Array.from(d.recommendations) as string[]).sort(),
                     dataPoints: d.count,
                     events: d.events
                 };
             }).sort((a, b) => b.score - a.score);
-
         } catch (error) {
             console.error('Error getting driver performance:', error);
             return [];
@@ -340,56 +286,50 @@ export class ScoringEngine {
     }
 
     async getCountryPerformance(start: string, end: string, options?: { warehouseNames?: string[], weights?: ScoringWeights }): Promise<AggregatedPerformance[]> {
-        // We always get all drivers to aggregate countries, ignoring the country filter for the country list itself
-        // but we support a warehouse filter to see country performance for a specific warehouse
         const drivers = await this.getDriverPerformance(start, end, { warehouseNames: options?.warehouseNames, weights: options?.weights });
         const countryMap = new Map<string, any>();
 
         drivers.forEach(d => {
             if (!countryMap.has(d.country)) {
-                countryMap.set(d.country, { name: d.country, totalScore: 0, driversCount: 0, totalDistance: 0 });
+                countryMap.set(d.country, { name: d.country, totalWeightedScore: 0, driversCount: 0, totalDistance: 0 });
             }
             const c = countryMap.get(d.country);
-            c.totalScore += d.score;
+            c.totalWeightedScore += (d.score * d.distance);
             c.driversCount++;
             c.totalDistance += d.distance;
         });
 
         return Array.from(countryMap.values()).map(c => ({
             name: c.name,
-            score: parseFloat((c.totalScore / c.driversCount).toFixed(2)),
+            score: c.totalDistance > 0 ? parseFloat((c.totalWeightedScore / c.totalDistance).toFixed(2)) : 0,
             driversCount: c.driversCount,
             totalDistance: parseFloat(c.totalDistance.toFixed(2))
         })).sort((a, b) => b.score - a.score);
     }
 
     async getWarehousePerformance(start: string, end: string, weights?: ScoringWeights, options?: { countryNames?: string[] }): Promise<AggregatedPerformance[]> {
-        // Warehouse performance can be filtered by country
         const drivers = await this.getDriverPerformance(start, end, { weights, countryNames: options?.countryNames });
         const warehouseMap = new Map<string, any>();
 
         drivers.forEach(d => {
             if (!warehouseMap.has(d.warehouse)) {
-                warehouseMap.set(d.warehouse, { name: d.warehouse, totalScore: 0, driversCount: 0, totalDistance: 0 });
+                warehouseMap.set(d.warehouse, { name: d.warehouse, totalWeightedScore: 0, driversCount: 0, totalDistance: 0 });
             }
             const w = warehouseMap.get(d.warehouse);
-            w.totalScore += d.score;
+            w.totalWeightedScore += (d.score * d.distance);
             w.driversCount++;
             w.totalDistance += d.distance;
         });
 
         return Array.from(warehouseMap.values()).map(w => ({
             name: w.name,
-            score: parseFloat((w.totalScore / w.driversCount).toFixed(2)),
+            score: w.totalDistance > 0 ? parseFloat((w.totalWeightedScore / w.totalDistance).toFixed(2)) : 0,
             driversCount: w.driversCount,
             totalDistance: parseFloat(w.totalDistance.toFixed(2))
         })).sort((a, b) => b.score - a.score);
     }
 
     async getVehiclePerformance(start: string, end: string, options?: { countryNames?: string[], warehouseNames?: string[], weights?: ScoringWeights }): Promise<VehiclePerformance[]> {
-        // We calculate vehicle performance by re-aggregating the driver periods 
-        // that hit specific vehicles, doing this via the DB jsonb_array_elements.
-
         let query = `
             SELECT 
                 v.license_plate,
@@ -397,8 +337,8 @@ export class ScoringEngine {
                 v.metadata->>'model' as model,
                 COUNT(es.id) as trip_count,
                 SUM(CAST(es.metrics->>'mileage' AS NUMERIC)) as total_distance,
-                AVG(CAST(es.metrics->>'averageConsumption' AS NUMERIC)) as avg_consumption,
-                AVG(es.overall_score) as avg_score
+                SUM(CAST(es.metrics->>'averageConsumption' AS NUMERIC) * CAST(es.metrics->>'mileage' AS NUMERIC)) as weighted_consumption,
+                SUM(es.overall_score * CAST(es.metrics->>'mileage' AS NUMERIC)) as weighted_score
             FROM vehicles v
             JOIN ecodriving_scores es 
               ON v.license_plate IN (
@@ -430,7 +370,7 @@ export class ScoringEngine {
 
         query += `
             GROUP BY v.license_plate, manufacturer, model
-            ORDER BY avg_score DESC
+            ORDER BY weighted_score DESC
         `;
 
         try {
@@ -440,9 +380,9 @@ export class ScoringEngine {
                 licensePlate: row.license_plate,
                 manufacturer: row.manufacturer || 'Unknown',
                 model: row.model || 'Unknown',
-                score: parseFloat(parseFloat(row.avg_score || 0).toFixed(2)),
+                score: row.total_distance > 0 ? parseFloat((row.weighted_score / row.total_distance).toFixed(2)) : 0,
                 distance: parseFloat(parseFloat(row.total_distance || 0).toFixed(1)),
-                fuelConsumption: parseFloat(parseFloat(row.avg_consumption || 0).toFixed(2))
+                fuelConsumption: row.total_distance > 0 ? parseFloat((row.weighted_consumption / row.total_distance).toFixed(2)) : 0
             }));
         } catch (error) {
             console.error('Error getting vehicle performance:', error);
