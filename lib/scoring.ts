@@ -79,25 +79,19 @@ export const RECOMMENDATION_LABELS: Record<number, string> = {
 
 export class ScoringEngine {
     private calculateCustomScore(metrics: any, weights: ScoringWeights): number {
-        // If the report already has an overall_score and weights are default, use it
-        // Otherwise, re-calculate based on event counts and weights
-
         let score = 10.0;
         const dist = parseFloat(metrics.mileage) || 0;
-        if (dist < 0.1) return 10.0; // Perfect score for no/low distance
+        if (dist < 0.1) return 10.0;
 
         const distRatio = dist / 100;
         const counts = metrics.eventCounts || {};
 
-        // Example penalty logic based on Frotcom defaults
-        // (Simplified placeholder until exact formulas are confirmed)
         if (counts.lowSpeedAcceleration) score -= (counts.lowSpeedAcceleration / distRatio) * weights.harshAccelerationLow * 0.5;
         if (counts.highSpeedAcceleration) score -= (counts.highSpeedAcceleration / distRatio) * weights.harshAccelerationHigh * 0.8;
         if (counts.lowSpeedBreak) score -= (counts.lowSpeedBreak / distRatio) * weights.harshBrakingLow * 0.5;
         if (counts.highSpeedBreak) score -= (counts.highSpeedBreak / distRatio) * weights.harshBrakingHigh * 0.8;
         if (counts.lateralAcceleration) score -= (counts.lateralAcceleration / distRatio) * weights.harshCornering * 0.6;
 
-        // Time-based metrics
         const idlePerc = parseFloat(metrics.idleTimePerc) || 0;
         if (idlePerc > 10) score -= (idlePerc - 10) * weights.excessiveIdling * 0.1;
 
@@ -157,6 +151,7 @@ export class ScoringEngine {
         }
 
         const weights = options?.weights || DEFAULT_WEIGHTS;
+        const isDefaultWeights = this.weightsAreDefault(weights);
 
         try {
             const res = await pool.query(query, params);
@@ -164,7 +159,7 @@ export class ScoringEngine {
 
             res.rows.forEach(row => {
                 const driverId = row.driver_id;
-                const score = this.calculateCustomScore(row.metrics, weights);
+                const score = isDefaultWeights ? parseFloat(row.overall_score) : this.calculateCustomScore(row.metrics, weights);
                 const distance = parseFloat(row.metrics.mileage) || 0;
                 const drivingTime = parseFloat(row.metrics.drivingTime) || 0;
                 const idling = parseFloat(row.metrics.idleTimePerc) || 0;
@@ -190,7 +185,7 @@ export class ScoringEngine {
                 }
 
                 const d = driverMap.get(driverId);
-                const isWeightable = !(score === 0 && row.metrics.hasLowMileage) && distance > 0;
+                const isWeightable = !(score === 0 && (row.metrics.hasLowMileage || distance < 1.0)) && distance > 0;
 
                 if (isWeightable) {
                     d.totalWeightedScore += score * distance;
@@ -273,14 +268,14 @@ export class ScoringEngine {
                     idling: d.totalDistanceForWeights > 0 ? parseFloat((d.totalIdlingWeighted / d.totalDistanceForWeights).toFixed(2)) : 0,
                     consumption: d.totalDistanceForWeights > 0 ? parseFloat((d.totalConsumptionWeighted / d.totalDistanceForWeights).toFixed(2)) : 0,
                     rpm: d.totalDistanceForWeights > 0 ? parseFloat((d.totalRPMWeighted / d.totalDistanceForWeights).toFixed(2)) : 0,
-                    vehicles: (Array.from(d.vehicles) as string[]).sort(),
-                    recommendations: (Array.from(d.recommendations) as string[]).sort(),
+                    vehicles: Array.from(d.vehicles) as string[],
+                    recommendations: Array.from(d.recommendations) as string[],
                     dataPoints: d.count,
                     events: d.events
                 };
             }).sort((a, b) => b.score - a.score);
         } catch (error) {
-            console.error('Error getting driver performance:', error);
+            console.error('Error in getDriverPerformance:', error);
             return [];
         }
     }
@@ -375,7 +370,6 @@ export class ScoringEngine {
 
         try {
             const res = await pool.query(query, params);
-
             return res.rows.map(row => ({
                 licensePlate: row.license_plate,
                 manufacturer: row.manufacturer || 'Unknown',
@@ -385,7 +379,7 @@ export class ScoringEngine {
                 fuelConsumption: row.total_distance > 0 ? parseFloat((row.weighted_consumption / row.total_distance).toFixed(2)) : 0
             }));
         } catch (error) {
-            console.error('Error getting vehicle performance:', error);
+            console.error('Error in getVehiclePerformance:', error);
             return [];
         }
     }
