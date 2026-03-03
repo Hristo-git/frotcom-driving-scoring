@@ -197,9 +197,9 @@ export class ScoringEngine {
                 }
 
                 const d = driverMap.get(driverId);
-                // We revert to 1km threshold because excluding all < 70km days caused larger discrepancies.
-                // It seems Frotcom includes the impact of low mileage days in its period aggregation.
-                const isWeightable = !(score === 0 && (row.metrics.hasLowMileage || distance < 1.0)) && distance > 0;
+                // The user confirmed that Frotcom includes the impact of low mileage days 
+                // in its period aggregation, which lowers the overall score.
+                const isWeightable = distance > 0;
 
                 if (isWeightable) {
                     d.totalWeightedScore += score * distance;
