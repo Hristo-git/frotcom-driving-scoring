@@ -106,29 +106,32 @@ export async function fetchAndStoreEcodriving(start: string, end: string) {
         let attributedFromVehicle = 0;
 
         for (const record of results) {
-            const driversId: number[] = record.driversId || [];
-            const nonZeroDrivers = driversId.filter((id: number) => id !== 0);
-
             let driverFrotcomId: string | null = null;
 
-            if (nonZeroDrivers.length === 1) {
-                // Single identified driver
-                driverFrotcomId = nonZeroDrivers[0].toString();
-            } else if (nonZeroDrivers.length === 0) {
-                // Unidentified trip — fall back to the vehicle's assigned driver
-                const assignedId = vehicleDriverMap.get(record.licensePlate);
-                if (assignedId) {
-                    driverFrotcomId = assignedId;
-                    attributedFromVehicle++;
+            if (record.driverId && record.driverId !== 0) {
+                driverFrotcomId = record.driverId.toString();
+            } else {
+                const driversId: number[] = record.driversId || [];
+                const nonZeroDrivers = driversId.filter((id: number) => id !== 0);
+
+                if (nonZeroDrivers.length === 1) {
+                    driverFrotcomId = nonZeroDrivers[0].toString();
+                } else if (nonZeroDrivers.length === 0) {
+                    const plate = record.licensePlate || (record.vehicles && record.vehicles[0]);
+                    const assignedId = plate ? vehicleDriverMap.get(plate) : null;
+                    if (assignedId) {
+                        driverFrotcomId = assignedId;
+                        attributedFromVehicle++;
+                    } else {
+                        skippedNoDriver++;
+                        continue;
+                    }
                 } else {
-                    skippedNoDriver++;
+                    skippedMultiDriver++;
                     continue;
                 }
-            } else {
-                // Multiple drivers on one vehicle segment — skip (rare, avoids double-counting)
-                skippedMultiDriver++;
-                continue;
             }
+            if (!driverFrotcomId) continue;
 
             const internalDriverId = driverMap.get(driverFrotcomId);
             if (!internalDriverId) {
@@ -174,6 +177,13 @@ export async function fetchAndStoreEcodriving(start: string, end: string) {
 
             if (record.licensePlate && !agg.vehicles.includes(record.licensePlate)) {
                 agg.vehicles.push(record.licensePlate);
+            }
+            if (Array.isArray(record.vehicles)) {
+                record.vehicles.forEach((plate: string) => {
+                    if (!agg.vehicles.includes(plate)) {
+                        agg.vehicles.push(plate);
+                    }
+                });
             }
 
             // Weighted averages — only for records where the metric is present

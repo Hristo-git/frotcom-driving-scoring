@@ -68,9 +68,9 @@ interface LocationsMapProps {
 }
 
 function getColorByScore(score: number): string {
-    if (score >= 9) return '#10b981'; // Success / Green
-    if (score >= 7) return '#f59e0b'; // Warning / Orange
-    return '#ef4444'; // Danger / Red
+    if (score >= 7.0) return '#10b981'; // Green (Success)
+    if (score >= 4.0) return '#f59e0b'; // Orange (Warning)
+    return '#ef4444'; // Red (Danger)
 }
 
 export default function LocationsMap({ data, selectedLocation = [], onLocationSelect }: LocationsMapProps) {

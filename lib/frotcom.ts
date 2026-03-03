@@ -175,18 +175,13 @@ export class FrotcomClient {
         throw new Error("Method requires specific driver/object ID implementation");
     }
 
-    static async getDriverEcodriving(driverId: string, start: string, end: string): Promise<any> {
-        const url = `v2/ecodriving/driver?id=${driverId}&from_datetime=${start}&to_datetime=${end}`;
-        return this.request(url);
-    }
-
     static async calculateEcodriving(start: string, end: string, driverIds?: number[], vehicleIds?: number[], groupBy?: string): Promise<any[]> {
         return this.request<any[]>('v2/ecodriving/calculate', 'POST', {
-            from_datetime: toFrotcomLocal(start),
-            to_datetime: toFrotcomLocal(end),
+            from: toFrotcomLocal(start),
+            to: toFrotcomLocal(end),
             driverIds,
             vehicleIds,
-            groupBy: groupBy
+            groupBy: groupBy || 'driver'
         });
     }
 }

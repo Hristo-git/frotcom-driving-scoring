@@ -26,8 +26,8 @@ const CustomTooltip = ({ active, payload, label }: any) => {
     if (active && payload && payload.length) {
         const score = payload[0].value;
         let color = '#ef4444'; // Red
-        if (score >= 9) color = '#10b981'; // Green
-        else if (score >= 7) color = '#f59e0b'; // Orange
+        if (score >= 7.0) color = '#10b981'; // Green
+        else if (score >= 4.0) color = '#f59e0b'; // Orange
 
         return (
             <div style={{
@@ -107,9 +107,9 @@ export default function WarehouseChart({ data, selectedWarehouses = [], onWareho
                             const isSelected = selectedWarehouses.includes(entry.name);
 
                             // Color based on performance
-                            let fill = '#ef4444'; // Low -> Red
-                            if (entry.score >= 9) fill = '#10b981'; // High -> Green
-                            else if (entry.score >= 7) fill = '#f59e0b'; // Med -> Orange
+                            let fill = '#ef4444'; // Red
+                            if (entry.score >= 7.0) fill = '#10b981'; // Green
+                            else if (entry.score >= 4.0) fill = '#f59e0b'; // Orange
 
                             // If something is selected, dim the unselected ones
                             if (selectedWarehouses.length > 0 && !isSelected) {
