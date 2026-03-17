@@ -91,56 +91,39 @@ export async function fetchAndStoreEcodriving(start: string, end: string) {
             console.warn('Could not load vehicle-driver assignments:', e);
         }
 
-        // Fetch vehicle-level records (no groupBy).
-        // With no groupBy, each record represents a vehicle segment and has:
-        //   driversId: [X]   — dynamically identified driver (card/key)
-        //   driversId: [0]   — no driver tagged → attribute via vehicle assignment
-        console.log(`Fetching vehicle-level ecodriving data...`);
-        const results = await FrotcomClient.calculateEcodriving(start, end);
-        console.log(`Received ${results.length} vehicle-level records.`);
+        // 0. Clean up existing scores for this specific period to prevent stale rows
+        // (drivers who were in the fleet on a previous sync but aren't in this one)
+        await pool.query(
+            'DELETE FROM ecodriving_scores WHERE period_start = $1 AND period_end = $2',
+            [start, end]
+        );
+
+        // 1. Fetch by Driver
+        console.log(`Fetching driver-level ecodriving data...`);
+        const driverResults = await FrotcomClient.calculateEcodriving(start, end, undefined, undefined, 'driver');
+        console.log(`Received ${driverResults.length} driver-level records.`);
 
         // Aggregate per driver
         const driverAggregates = new Map<string, DriverAggregate>();
-        let skippedNoDriver = 0;
-        let skippedMultiDriver = 0;
-        let attributedFromVehicle = 0;
 
-        for (const record of results) {
-            let driverFrotcomId: string | null = null;
+        let totalDriverMileage = 0;
+        let totalDriverMileageGps = 0;
+        let totalDriverDrivingTime = 0;
+        let totalDriverConsumption = 0;
+        let totalDriverScoreWeighted = 0;
+        let totalDriverScoreCustomWeighted = 0;
+        let totalDriverIdleWeighted = 0;
+        let totalDriverRpmWeighted = 0;
 
-            if (record.driverId && record.driverId !== 0) {
-                driverFrotcomId = record.driverId.toString();
-            } else {
-                const driversId: number[] = record.driversId || [];
-                const nonZeroDrivers = driversId.filter((id: number) => id !== 0);
-
-                if (nonZeroDrivers.length === 1) {
-                    driverFrotcomId = nonZeroDrivers[0].toString();
-                } else if (nonZeroDrivers.length === 0) {
-                    const plate = record.licensePlate || (record.vehicles && record.vehicles[0]);
-                    const assignedId = plate ? vehicleDriverMap.get(plate) : null;
-                    if (assignedId) {
-                        driverFrotcomId = assignedId;
-                        attributedFromVehicle++;
-                    } else {
-                        skippedNoDriver++;
-                        continue;
-                    }
-                } else {
-                    skippedMultiDriver++;
-                    continue;
-                }
-            }
-            if (!driverFrotcomId) continue;
+        for (const record of driverResults) {
+            if (!record.driverId) continue;
+            const driverFrotcomId = record.driverId.toString();
 
             const internalDriverId = driverMap.get(driverFrotcomId);
-            if (!internalDriverId) {
-                skippedNoDriver++;
-                continue;
-            }
+            if (!internalDriverId) continue;
 
-            // Prefer CANBus mileage over GPS
-            const mileage = (record.mileageCanbus && record.mileageCanbus > 0)
+            // Prioritize CANbus mileage to match Frotcom Dashboard totals
+            const mileage = (record.mileageCanbus !== undefined && record.mileageCanbus !== null)
                 ? record.mileageCanbus
                 : (record.mileageGps || 0);
 
@@ -172,51 +155,112 @@ export async function fetchAndStoreEcodriving(start: string, end: string) {
             agg.totalConsumption += (record.totalConsumption || 0);
             if (record.hasLowMileage) agg.hasLowMileage = true;
 
-            // Collect all recommendation IDs (union across vehicle segments)
             (record.recommendations || []).forEach((id: number) => agg.recommendationIds.add(id));
 
-            if (record.licensePlate && !agg.vehicles.includes(record.licensePlate)) {
-                agg.vehicles.push(record.licensePlate);
-            }
+            if (record.licensePlate && !agg.vehicles.includes(record.licensePlate)) agg.vehicles.push(record.licensePlate);
             if (Array.isArray(record.vehicles)) {
                 record.vehicles.forEach((plate: string) => {
-                    if (!agg.vehicles.includes(plate)) {
-                        agg.vehicles.push(plate);
-                    }
+                    if (!agg.vehicles.includes(plate)) agg.vehicles.push(plate);
                 });
             }
 
-            // Weighted averages — only for records where the metric is present
             const scoreVal = parseFloat(record.score);
             if (!isNaN(scoreVal) && mileage > 0) {
                 agg.scoreWeightedSum += scoreVal * mileage;
                 agg.scoreWeightKm += mileage;
+                totalDriverScoreWeighted += scoreVal * mileage;
             }
 
             const idleVal = parseFloat(record.idleTimePerc);
             if (!isNaN(idleVal) && mileage > 0) {
                 agg.idleWeightedSum += idleVal * mileage;
                 agg.idleWeightKm += mileage;
+                totalDriverIdleWeighted += idleVal * mileage;
             }
 
             const rpmVal = parseFloat(record.highRPMPerc);
             if (!isNaN(rpmVal) && mileage > 0) {
                 agg.rpmWeightedSum += rpmVal * mileage;
                 agg.rpmWeightKm += mileage;
+                totalDriverRpmWeighted += rpmVal * mileage;
             }
 
             const scoreCustomizedVal = parseFloat(record.scoreCustomized);
             if (!isNaN(scoreCustomizedVal) && mileage > 0) {
                 agg.scoreCustomizedWeightedSum += scoreCustomizedVal * mileage;
                 agg.scoreCustomizedWeightKm += mileage;
+                totalDriverScoreCustomWeighted += scoreCustomizedVal * mileage;
             }
+
+            totalDriverMileage += mileage;
+            totalDriverMileageGps += (record.mileageGps || 0);
+            totalDriverDrivingTime += (record.drivingTime || 0);
+            totalDriverConsumption += (record.totalConsumption || 0);
         }
 
-        console.log(
-            `Attribution: ${driverAggregates.size} drivers, ` +
-            `${attributedFromVehicle} unidentified trips attributed via vehicle assignment, ` +
-            `${skippedNoDriver} skipped (no driver), ${skippedMultiDriver} skipped (multi-driver).`
-        );
+        // 2. Fetch by Vehicle to find the missing totals
+        console.log(`Fetching vehicle-level ecodriving data...`);
+        const vehicleResults = await FrotcomClient.calculateEcodriving(start, end, undefined, undefined, 'vehicle');
+
+        let totalVehicleMileage = 0;
+        let totalVehicleMileageGps = 0;
+        let totalVehicleDrivingTime = 0;
+        let totalVehicleConsumption = 0;
+        let totalVehicleScoreWeighted = 0;
+        let totalVehicleScoreCustomWeighted = 0;
+        let totalVehicleIdleWeighted = 0;
+        let totalVehicleRpmWeighted = 0;
+
+        for (const record of vehicleResults) {
+            // Prioritize CANbus mileage to match Frotcom Dashboard totals
+            const mileage = (record.mileageCanbus !== undefined && record.mileageCanbus !== null)
+                ? record.mileageCanbus
+                : (record.mileageGps || 0);
+
+            totalVehicleMileage += mileage;
+            totalVehicleMileageGps += (record.mileageGps || 0);
+            totalVehicleDrivingTime += (record.drivingTime || 0);
+            totalVehicleConsumption += (record.totalConsumption || 0);
+
+            const scoreVal = parseFloat(record.score);
+            if (!isNaN(scoreVal) && mileage > 0) totalVehicleScoreWeighted += scoreVal * mileage;
+
+            const idleVal = parseFloat(record.idleTimePerc);
+            if (!isNaN(idleVal) && mileage > 0) totalVehicleIdleWeighted += idleVal * mileage;
+
+            const rpmVal = parseFloat(record.highRPMPerc);
+            if (!isNaN(rpmVal) && mileage > 0) totalVehicleRpmWeighted += rpmVal * mileage;
+
+            const scoreCustomizedVal = parseFloat(record.scoreCustomized);
+            if (!isNaN(scoreCustomizedVal) && mileage > 0) totalVehicleScoreCustomWeighted += scoreCustomizedVal * mileage;
+        }
+
+        const missingMileage = Math.max(0, totalVehicleMileage - totalDriverMileage);
+
+        if (missingMileage > 0.001) { // Only create Unidentified Driver if gap exists
+            const unknownDriverInternalId = driverMap.get('UNKNOWN_DRIVER');
+            if (unknownDriverInternalId) {
+                driverAggregates.set('UNKNOWN_DRIVER', {
+                    internalDriverId: unknownDriverInternalId,
+                    totalMileage: missingMileage,
+                    totalMileageGps: Math.max(0, totalVehicleMileageGps - totalDriverMileageGps),
+                    totalDrivingTime: Math.max(0, totalVehicleDrivingTime - totalDriverDrivingTime),
+                    totalConsumption: Math.max(0, totalVehicleConsumption - totalDriverConsumption),
+                    hasLowMileage: false,
+                    idleWeightedSum: Math.max(0, totalVehicleIdleWeighted - totalDriverIdleWeighted),
+                    idleWeightKm: missingMileage,
+                    rpmWeightedSum: Math.max(0, totalVehicleRpmWeighted - totalDriverRpmWeighted),
+                    rpmWeightKm: missingMileage,
+                    scoreWeightedSum: Math.max(0, totalVehicleScoreWeighted - totalDriverScoreWeighted),
+                    scoreWeightKm: missingMileage,
+                    scoreCustomizedWeightedSum: Math.max(0, totalVehicleScoreCustomWeighted - totalDriverScoreCustomWeighted),
+                    scoreCustomizedWeightKm: missingMileage,
+                    recommendationIds: new Set<number>(),
+                    vehicles: []
+                });
+                console.log(`Generated synthetic UNKNOWN_DRIVER entry with ${missingMileage.toFixed(2)}km missing mileage.`);
+            }
+        }
 
         // Store aggregated records
         let insertedCount = 0;

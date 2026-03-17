@@ -50,14 +50,14 @@ export interface VehiclePerformance {
 }
 
 export const DEFAULT_WEIGHTS: ScoringWeights = {
-    harshAccelerationLow: 90.0,
-    harshAccelerationHigh: 75.0,
-    harshBrakingLow: 65.0,
-    harshBrakingHigh: 75.0,
-    harshCornering: 70.0,
-    accelBrakeSwitch: 0.1,
-    excessiveIdling: 20.0,
-    highRPM: 0.15,
+    harshAccelerationLow: 1.0,
+    harshAccelerationHigh: 1.5,
+    harshBrakingLow: 1.0,
+    harshBrakingHigh: 1.5,
+    harshCornering: 1.2,
+    accelBrakeSwitch: 0.5, 
+    excessiveIdling: 0.0,
+    highRPM: 0.0,
     alarms: 0.1,
     noCruiseControl: 0.1,
     accelDuringCruise: 0.1
@@ -82,33 +82,36 @@ export class ScoringEngine {
         const dist = parseFloat(metrics.mileage) || 0;
         if (dist < 0.1) return 10.0;
 
-        // Sum weights for normalization
-        const sumWeights = Object.values(weights).reduce((a, b) => a + b, 0);
-        if (sumWeights === 0) return 10.0;
-
         let score = 10.0;
         const distRatio = dist / 100;
         const counts = metrics.eventCounts || {};
 
-        // Normalization factor (Frotcom uses normalized weights)
-        const nf = (w: number) => w / sumWeights;
+        // Penalty = (Events / DistRatio) * Weight * K
+        // K=0.155 calibrated to align Nikolai's case (4.1 dashboard score over 2692.4km)
+        const K = 0.155;
 
-        // Penalty = (Events / DistRatio) * NormalizedWeight * K
-        // Using approximate K=0.015 based on typical Frotcom scaling
-        const K = 0.015;
+        const p1 = (counts.lowSpeedAcceleration || 0) / distRatio * weights.harshAccelerationLow * K;
+        const p2 = (counts.highSpeedAcceleration || 0) / distRatio * weights.harshAccelerationHigh * K;
+        const p3 = (counts.lowSpeedBreak || 0) / distRatio * weights.harshBrakingLow * K;
+        const p4 = (counts.highSpeedBreak || 0) / distRatio * weights.harshBrakingHigh * K;
+        const p5 = (counts.lateralAcceleration || 0) / distRatio * weights.harshCornering * K;
+        const p6 = (counts.accelBrakeFastShift || 0) / distRatio * weights.accelBrakeSwitch * K;
+        
+        const p7 = (counts.accWithCCActive || 0) / distRatio * weights.accelDuringCruise * K;
+        const p8 = (counts.noCruise || 0) / distRatio * weights.noCruiseControl * K;
 
-        if (counts.lowSpeedAcceleration) score -= (counts.lowSpeedAcceleration / distRatio) * nf(weights.harshAccelerationLow) * K * 10;
-        if (counts.highSpeedAcceleration) score -= (counts.highSpeedAcceleration / distRatio) * nf(weights.harshAccelerationHigh) * K * 15;
-        if (counts.lowSpeedBreak) score -= (counts.lowSpeedBreak / distRatio) * nf(weights.harshBrakingLow) * K * 10;
-        if (counts.highSpeedBreak) score -= (counts.highSpeedBreak / distRatio) * nf(weights.harshBrakingHigh) * K * 15;
-        if (counts.lateralAcceleration) score -= (counts.lateralAcceleration / distRatio) * nf(weights.harshCornering) * K * 12;
+        score -= (p1 + p2 + p3 + p4 + p5 + p6 + p7 + p8);
 
-        // Time-based metrics
-        const idlePerc = parseFloat(metrics.idleTimePerc) || 0;
-        if (idlePerc > 10) score -= (idlePerc - 10) * nf(weights.excessiveIdling) * 0.5;
+        // Time-based metrics (excluded by default weights=0, but kept for custom weighting)
+        const idlePerc = Math.abs(parseFloat(metrics.idleTimePerc) || 0);
+        if (weights.excessiveIdling > 0) {
+            score -= (idlePerc / 100) * weights.excessiveIdling * 10;
+        }
 
-        const rpmPerc = parseFloat(metrics.highRPMPerc) || 0;
-        if (rpmPerc > 5) score -= (rpmPerc - 5) * nf(weights.highRPM) * 0.2;
+        const rpmPerc = Math.abs(parseFloat(metrics.highRPMPerc) || 0);
+        if (weights.highRPM > 0) {
+            score -= (rpmPerc / 100) * weights.highRPM * 10;
+        }
 
         return Math.max(0, Math.min(10, score));
     }
@@ -130,7 +133,7 @@ export class ScoringEngine {
         );
     }
 
-    async getDriverPerformance(start: string, end: string, options?: { countryNames?: string[], warehouseNames?: string[], weights?: ScoringWeights }): Promise<PerformanceReport[]> {
+    async getDriverPerformance(start: string, end: string, options?: { countryNames?: string[], warehouseNames?: string[], weights?: ScoringWeights, driverIds?: number[] }): Promise<PerformanceReport[]> {
         let query = `
             SELECT 
                 d.id as driver_id, d.name, c.name as country, w.name as warehouse,
@@ -162,8 +165,13 @@ export class ScoringEngine {
             paramIdx++;
         }
 
+        if (options?.driverIds && options.driverIds.length > 0) {
+            query += ` AND d.id = ANY($${paramIdx}::int[])`;
+            params.push(options.driverIds);
+            paramIdx++;
+        }
+
         const weights = options?.weights || DEFAULT_WEIGHTS;
-        const isDefaultWeights = this.weightsAreDefault(weights);
 
         try {
             const res = await pool.query(query, params);
@@ -171,7 +179,6 @@ export class ScoringEngine {
 
             res.rows.forEach(row => {
                 const driverId = row.driver_id;
-                const score = isDefaultWeights ? parseFloat(row.overall_score) : this.calculateCustomScore(row.metrics, weights);
                 const distance = parseFloat(row.metrics.mileage) || 0;
                 const drivingTime = parseFloat(row.metrics.drivingTime) || 0;
                 const idling = parseFloat(row.metrics.idleTimePerc) || 0;
@@ -181,10 +188,14 @@ export class ScoringEngine {
 
                 if (!driverMap.has(driverId)) {
                     driverMap.set(driverId, {
-                        ...row,
-                        totalWeightedScore: 0,
-                        totalDistanceForWeights: 0,
+                        driver_id: driverId,
+                        name: row.name,
+                        country: row.country,
+                        warehouse: row.warehouse,
+                        country_id: row.country_id,
+                        warehouse_id: row.warehouse_id,
                         totalDistance: 0,
+                        totalDistanceForWeights: 0,
                         totalDrivingTime: 0,
                         totalIdlingWeighted: 0,
                         totalConsumptionWeighted: 0,
@@ -197,12 +208,9 @@ export class ScoringEngine {
                 }
 
                 const d = driverMap.get(driverId);
-                // The user confirmed that Frotcom includes the impact of low mileage days 
-                // in its period aggregation, which lowers the overall score.
                 const isWeightable = distance > 0;
 
                 if (isWeightable) {
-                    d.totalWeightedScore += score * distance;
                     d.totalIdlingWeighted += idling * distance;
                     d.totalConsumptionWeighted += consumption * distance;
                     d.totalRPMWeighted += rpm * distance;
@@ -256,9 +264,16 @@ export class ScoringEngine {
             });
 
             return Array.from(driverMap.values()).map(d => {
-                const avgScore = d.totalDistanceForWeights > 0 ? d.totalWeightedScore / d.totalDistanceForWeights : 0;
+                const aggregatedMetrics = {
+                    mileage: d.totalDistance,
+                    idleTimePerc: d.totalDistanceForWeights > 0 ? d.totalIdlingWeighted / d.totalDistanceForWeights : 0,
+                    highRPMPerc: d.totalDistanceForWeights > 0 ? d.totalRPMWeighted / d.totalDistanceForWeights : 0,
+                    eventCounts: d.events
+                };
 
-                if (d.recommendations.size === 0 && avgScore < 8.0 && d.totalDistance > 0) {
+                const finalScore = this.calculateCustomScore(aggregatedMetrics, weights);
+
+                if (d.recommendations.size === 0 && finalScore < 8.0 && d.totalDistance > 0) {
                     const distRatio = d.totalDistance / 100;
                     if ((d.events.lowSpeedAcceleration || 0) / distRatio > 5) d.recommendations.add('harshAccelerationLow');
                     if ((d.events.highSpeedAcceleration || 0) / distRatio > 3) d.recommendations.add('harshAccelerationHigh');
@@ -276,7 +291,7 @@ export class ScoringEngine {
                     warehouse: d.warehouse || 'Unknown',
                     countryId: d.country_id,
                     warehouseId: d.warehouse_id,
-                    score: parseFloat(avgScore.toFixed(2)),
+                    score: parseFloat(finalScore.toFixed(2)),
                     distance: parseFloat(d.totalDistance.toFixed(1)),
                     drivingTime: Math.round(d.totalDrivingTime),
                     idling: d.totalDistanceForWeights > 0 ? parseFloat((d.totalIdlingWeighted / d.totalDistanceForWeights).toFixed(2)) : 0,
