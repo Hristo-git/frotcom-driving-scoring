@@ -57,7 +57,7 @@ export const DEFAULT_WEIGHTS: ScoringWeights = {
     harshCornering: 1.2,
     accelBrakeSwitch: 0.5, 
     excessiveIdling: 0.0,
-    highRPM: 0.05,
+    highRPM: 0.0,
     alarms: 0.1,
     noCruiseControl: 0.1,
     accelDuringCruise: 0.1
@@ -87,8 +87,8 @@ export class ScoringEngine {
         const counts = metrics.eventCounts || {};
 
         // Penalty = (Events / DistRatio) * Weight * K
-        // K=0.23 calibrated based on official Frotcom weights (10%/15% categories)
-        const K = 0.23;
+        // K=0.155 calibrated to align Nikolai's case (4.1 dashboard score over 2692.4km)
+        const K = 0.155;
 
         const p1 = (counts.lowSpeedAcceleration || 0) / distRatio * weights.harshAccelerationLow * K;
         const p2 = (counts.highSpeedAcceleration || 0) / distRatio * weights.harshAccelerationHigh * K;
@@ -99,21 +99,18 @@ export class ScoringEngine {
         
         const p7 = (counts.accWithCCActive || 0) / distRatio * weights.accelDuringCruise * K;
         const p8 = (counts.noCruise || 0) / distRatio * weights.noCruiseControl * K;
-        const p9 = (counts.highRPM || 0) / distRatio * weights.highRPM * K;
 
-        score -= (p1 + p2 + p3 + p4 + p5 + p6 + p7 + p8 + p9);
+        score -= (p1 + p2 + p3 + p4 + p5 + p6 + p7 + p8);
 
-        // Time-based metrics (Percentages)
+        // Time-based metrics (excluded by default weights=0, but kept for custom weighting)
         const idlePerc = Math.abs(parseFloat(metrics.idleTimePerc) || 0);
         if (weights.excessiveIdling > 0) {
-            // (Perc / 100) * Weight * 10 * K
-            score -= (idlePerc / 100) * weights.excessiveIdling * 10 * K;
+            score -= (idlePerc / 100) * weights.excessiveIdling * 10;
         }
 
         const rpmPerc = Math.abs(parseFloat(metrics.highRPMPerc) || 0);
         if (weights.highRPM > 0) {
-            // RPM percentage uses the same weight but smaller multiplier in UI logic
-            score -= (rpmPerc / 100) * weights.highRPM * 5 * K;
+            score -= (rpmPerc / 100) * weights.highRPM * 10;
         }
 
         return Math.max(0, Math.min(10, score));
@@ -234,6 +231,12 @@ export class ScoringEngine {
                         const label = RECOMMENDATION_LABELS[id];
                         if (label) d.recommendations.add(label);
                     });
+                }
+
+                if (row.metrics.eventCounts) {
+                    for (const [key, val] of Object.entries(row.metrics.eventCounts)) {
+                        d.events[key] = (d.events[key] || 0) + (val as number);
+                    }
                 }
             });
 
