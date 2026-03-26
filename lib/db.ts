@@ -3,7 +3,7 @@ import { Pool } from 'pg';
 import dotenv from 'dotenv';
 import path from 'path';
 
-dotenv.config({ path: path.resolve(process.cwd(), '.env.local') });
+dotenv.config({ path: path.join(__dirname, '..', '.env.local') });
 
 // Use a global variable to prevent multiple pools in development
 let pool: Pool;

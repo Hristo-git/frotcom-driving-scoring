@@ -50,17 +50,17 @@ export interface VehiclePerformance {
 }
 
 export const DEFAULT_WEIGHTS: ScoringWeights = {
-    harshAccelerationLow: 1.0,
-    harshAccelerationHigh: 1.5,
-    harshBrakingLow: 1.0,
-    harshBrakingHigh: 1.5,
-    harshCornering: 1.2,
-    accelBrakeSwitch: 0.5, 
+    harshAccelerationLow: 0.60,
+    harshAccelerationHigh: 0.50,
+    harshBrakingLow: 0.45,
+    harshBrakingHigh: 0.50,
+    harshCornering: 0.70,
+    accelBrakeSwitch: 0.02, 
     excessiveIdling: 0.0,
     highRPM: 0.0,
-    alarms: 0.1,
-    noCruiseControl: 0.1,
-    accelDuringCruise: 0.1
+    alarms: 0.0,
+    noCruiseControl: 0.0,
+    accelDuringCruise: 0.20
 };
 
 export const RECOMMENDATION_LABELS: Record<number, string> = {
@@ -78,7 +78,7 @@ export const RECOMMENDATION_LABELS: Record<number, string> = {
 };
 
 export class ScoringEngine {
-    private calculateCustomScore(metrics: any, weights: ScoringWeights): number {
+    private calculateCustomScore(metrics: any, weights: ScoringWeights, avgSpeed: number): number {
         const dist = parseFloat(metrics.mileage) || 0;
         if (dist < 0.1) return 10.0;
 
@@ -86,9 +86,10 @@ export class ScoringEngine {
         const distRatio = dist / 100;
         const counts = metrics.eventCounts || {};
 
-        // Penalty = (Events / DistRatio) * Weight * K
-        // K=0.155 calibrated to align Nikolai's case (4.1 dashboard score over 2692.4km)
-        const K = 0.155;
+        // K_base=1.05 calibrated to align with Frotcom's dashboard score across multiple profiles
+        // K_actual = K_base * (avgSpeed / 83)
+        const K_base = 1.05;
+        const K = K_base * (avgSpeed / 83);
 
         const p1 = (counts.lowSpeedAcceleration || 0) / distRatio * weights.harshAccelerationLow * K;
         const p2 = (counts.highSpeedAcceleration || 0) / distRatio * weights.harshAccelerationHigh * K;
@@ -105,7 +106,8 @@ export class ScoringEngine {
         // Time-based metrics (excluded by default weights=0, but kept for custom weighting)
         const idlePerc = Math.abs(parseFloat(metrics.idleTimePerc) || 0);
         if (weights.excessiveIdling > 0) {
-            score -= (idlePerc / 100) * weights.excessiveIdling * 10;
+            // Include K in idling penalty to align with other criteria
+            score -= (idlePerc / 100) * weights.excessiveIdling * 10 * K;
         }
 
         const rpmPerc = Math.abs(parseFloat(metrics.highRPMPerc) || 0);
@@ -240,15 +242,22 @@ export class ScoringEngine {
                 }
             });
 
-            // Fetch granular events
+            // Fetch granular events and apply thresholding
+            // Cornering: acceleration >= 3.36
+            // Acceleration (low/high): acceleration >= 1.25
+            // Braking (low/high): acceleration <= -2.2
             const eventQuery = `
                 SELECT 
                     driver_id, event_type, COUNT(*) as count
                 FROM ecodriving_events
-                WHERE DATE((started_at AT TIME ZONE 'UTC') AT TIME ZONE 'Europe/Sofia')
-                      >= DATE($1::timestamptz AT TIME ZONE 'Europe/Sofia')
-                  AND DATE((started_at AT TIME ZONE 'UTC') AT TIME ZONE 'Europe/Sofia')
-                      <= DATE($2::timestamptz AT TIME ZONE 'Europe/Sofia')
+                WHERE started_at >= ($1::timestamptz AT TIME ZONE 'Europe/Sofia')
+                  AND started_at <= ($2::timestamptz AT TIME ZONE 'Europe/Sofia')
+                  AND (
+                    (event_type = 'lateralAcceleration' AND acceleration >= 3.36) OR
+                    (event_type IN ('lowSpeedAcceleration', 'highSpeedAcceleration') AND acceleration >= 1.25) OR
+                    (event_type IN ('lowSpeedBreak', 'highSpeedBreak') AND acceleration <= -2.2) OR
+                    (event_type IN ('idling', 'accelBrakeFastShift', 'accWithCCActive', 'noCruise'))
+                  )
                 GROUP BY driver_id, event_type
             `;
             const eventRes = await pool.query(eventQuery, [start, end]);
@@ -259,11 +268,15 @@ export class ScoringEngine {
                 if (d) {
                     const type = ev.event_type;
                     const count = parseInt(ev.count);
-                    d.events[type] = (d.events[type] || 0) + count;
+                    // Use granular thresholded counts instead of basic summary counts for these types
+                    d.events[type] = count;
                 }
             });
 
             return Array.from(driverMap.values()).map(d => {
+                const drivingTimeHours = d.totalDrivingTime / 3600;
+                const avgSpeed = drivingTimeHours > 0 ? d.totalDistance / drivingTimeHours : 83; // fallback to highway reference speed
+
                 const aggregatedMetrics = {
                     mileage: d.totalDistance,
                     idleTimePerc: d.totalDistanceForWeights > 0 ? d.totalIdlingWeighted / d.totalDistanceForWeights : 0,
@@ -271,7 +284,7 @@ export class ScoringEngine {
                     eventCounts: d.events
                 };
 
-                const finalScore = this.calculateCustomScore(aggregatedMetrics, weights);
+                const finalScore = this.calculateCustomScore(aggregatedMetrics, weights, avgSpeed);
 
                 if (d.recommendations.size === 0 && finalScore < 8.0 && d.totalDistance > 0) {
                     const distRatio = d.totalDistance / 100;
