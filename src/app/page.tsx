@@ -3,6 +3,8 @@ import { ScoringEngine, DEFAULT_WEIGHTS, ScoringWeights } from '../../lib/scorin
 import DashboardClient from './DashboardClient';
 // import { unstable_noStore as noStore } from 'next/cache'; // Optional based on caching needs
 
+export const dynamic = 'force-dynamic';
+
 export default async function DashboardPage(props: {
     searchParams?: Promise<{ [key: string]: string | string[] | undefined }>;
 }) {
