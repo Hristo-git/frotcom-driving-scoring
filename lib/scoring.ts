@@ -7,10 +7,10 @@ export interface ScoringWeights {
     harshBrakingHigh: number;
     harshCornering: number;
     accelBrakeSwitch: number;
-    excessiveIdling: number;
-    highRPM: number;
+    excessiveIdling: number;    // Weight for idling %
+    highRPM: number;            // Weight for high RPM %
     alarms: number;
-    noCruiseControl: number;
+    noCruiseControl: number;    // Weight for % time without CC
     accelDuringCruise: number;
 }
 
@@ -50,17 +50,35 @@ export interface VehiclePerformance {
 }
 
 export const DEFAULT_WEIGHTS: ScoringWeights = {
-    harshAccelerationLow: 0.60,
-    harshAccelerationHigh: 0.50,
-    harshBrakingLow: 0.45,
-    harshBrakingHigh: 0.50,
-    harshCornering: 0.70,
-    accelBrakeSwitch: 0.02, 
-    excessiveIdling: 0.0,
-    highRPM: 0.0,
-    alarms: 0.0,
-    noCruiseControl: 0.0,
-    accelDuringCruise: 0.20
+    harshAccelerationLow: 0.60,      // Slider 1
+    harshAccelerationHigh: 0.60,     // Slider 2
+    harshBrakingLow: 0.75,           // Slider 3
+    harshBrakingHigh: 0.75,          // Slider 4
+    harshCornering: 0.90,            // Slider 5
+    accelBrakeSwitch: 0.00,          // Slider 6
+    excessiveIdling: 0.00,           // Slider 7 (Disabled as per user request)
+    highRPM: 0.00,                   // Slider 8
+    alarms: 0.00,                    // Slider 9
+    noCruiseControl: 0.05,           // Slider 10
+    accelDuringCruise: 0.00          // Slider 11
+};
+
+/**
+ * Scoring Profiles ("Skills")
+ * These can be invoked to apply different calibration sets.
+ */
+export const SCORING_PROFILES: Record<string, ScoringWeights> = {
+    frotcom_personalized: { ...DEFAULT_WEIGHTS },
+    safety_focused: {
+        ...DEFAULT_WEIGHTS,
+        harshCornering: 1.5,
+        alarms: 1.0
+    },
+    eco_economy: {
+        ...DEFAULT_WEIGHTS,
+        excessiveIdling: 1.5,
+        accelDuringCruise: 0.1
+    }
 };
 
 export const RECOMMENDATION_LABELS: Record<number, string> = {
@@ -77,45 +95,111 @@ export const RECOMMENDATION_LABELS: Record<number, string> = {
     11: 'accelDuringCruise'
 };
 
+const CATEGORY_THRESHOLDS = {
+    harshAccelerationLow: [
+        { max: 0.08, score: 10 }, { max: 0.35, score: 9 }, { max: 0.80, score: 8 },
+        { max: 1.30, score: 7 }, { max: 2.00, score: 6 }, { max: 2.85, score: 5 },
+        { max: 3.85, score: 4 }, { max: 5.50, score: 3 }, { max: 9.00, score: 2 }
+    ],
+    harshAccelerationHigh: [
+        { max: 0.03, score: 10 }, { max: 0.08, score: 9 }, { max: 0.20, score: 8 },
+        { max: 0.28, score: 7 }, { max: 0.45, score: 6 }, { max: 0.65, score: 5 },
+        { max: 1.15, score: 4 }, { max: 1.60, score: 3 }, { max: 2.65, score: 2 }
+    ],
+    harshBrakingLow: [
+        { max: 0.30, score: 10 }, { max: 0.80, score: 9 }, { max: 1.35, score: 8 },
+        { max: 1.75, score: 7 }, { max: 2.30, score: 6 }, { max: 3.00, score: 5 },
+        { max: 3.90, score: 4 }, { max: 4.90, score: 3 }, { max: 7.50, score: 2 }
+    ],
+    harshBrakingHigh: [
+        { max: 0.05, score: 10 }, { max: 0.10, score: 9 }, { max: 0.19, score: 8 },
+        { max: 0.30, score: 7 }, { max: 0.42, score: 6 }, { max: 0.56, score: 5 },
+        { max: 0.83, score: 4 }, { max: 1.21, score: 3 }, { max: 1.90, score: 2 }
+    ],
+    harshCornering: [
+        { max: 0.25, score: 10 }, { max: 1.20, score: 9 }, { max: 3.85, score: 8 },
+        { max: 7.70, score: 7 }, { max: 13.70, score: 6 }, { max: 19.70, score: 5 },
+        { max: 23.50, score: 4 }, { max: 35.20, score: 3 }, { max: 45.00, score: 2 }
+    ]
+};
+
+function getScoreFromTable(eventsPer100km: number, category: keyof typeof CATEGORY_THRESHOLDS): number {
+    const thresholds = CATEGORY_THRESHOLDS[category];
+    for (const t of thresholds) {
+        if (eventsPer100km <= t.max) return t.score;
+    }
+    return 1;
+}
+
 export class ScoringEngine {
+    private currentWeights: ScoringWeights = DEFAULT_WEIGHTS;
+
+    public setProfile(name: string): void {
+        const profile = SCORING_PROFILES[name];
+        if (profile) {
+            this.currentWeights = { ...profile };
+            console.log(`Scoring profile set to: ${name}`);
+        } else {
+            console.warn(`Profile ${name} not found. Keeping current weights.`);
+        }
+    }
+
+    public getProfile(): ScoringWeights {
+        return { ...this.currentWeights };
+    }
+
     private calculateCustomScore(metrics: any, weights: ScoringWeights, avgSpeed: number): number {
         const dist = parseFloat(metrics.mileage) || 0;
         if (dist < 0.1) return 10.0;
 
-        let score = 10.0;
         const distRatio = dist / 100;
         const counts = metrics.eventCounts || {};
 
-        // K_base=1.05 calibrated to align with Frotcom's dashboard score across multiple profiles
-        // K_actual = K_base * (avgSpeed / 83)
-        const K_base = 1.05;
-        const K = K_base * (avgSpeed / 83);
+        let totalWeight = 0;
+        let weightedScoreSum = 0;
 
-        const p1 = (counts.lowSpeedAcceleration || 0) / distRatio * weights.harshAccelerationLow * K;
-        const p2 = (counts.highSpeedAcceleration || 0) / distRatio * weights.harshAccelerationHigh * K;
-        const p3 = (counts.lowSpeedBreak || 0) / distRatio * weights.harshBrakingLow * K;
-        const p4 = (counts.highSpeedBreak || 0) / distRatio * weights.harshBrakingHigh * K;
-        const p5 = (counts.lateralAcceleration || 0) / distRatio * weights.harshCornering * K;
-        const p6 = (counts.accelBrakeFastShift || 0) / distRatio * weights.accelBrakeSwitch * K;
+        const addScore = (weight: number, scoreValue: number) => {
+            if (weight > 0) {
+                totalWeight += weight;
+                weightedScoreSum += (scoreValue * weight);
+            }
+        };
+
+        const evLowAccel = (counts.lowSpeedAcceleration || 0) / distRatio;
+        addScore(weights.harshAccelerationLow, getScoreFromTable(evLowAccel, 'harshAccelerationLow'));
+
+        const evHighAccel = (counts.highSpeedAcceleration || 0) / distRatio;
+        addScore(weights.harshAccelerationHigh, getScoreFromTable(evHighAccel, 'harshAccelerationHigh'));
+
+        const evLowBrake = (counts.lowSpeedBreak || 0) / distRatio;
+        addScore(weights.harshBrakingLow, getScoreFromTable(evLowBrake, 'harshBrakingLow'));
+
+        const evHighBrake = (counts.highSpeedBreak || 0) / distRatio;
+        addScore(weights.harshBrakingHigh, getScoreFromTable(evHighBrake, 'harshBrakingHigh'));
+
+        const evCornering = (counts.lateralAcceleration || 0) / distRatio;
+        addScore(weights.harshCornering, getScoreFromTable(evCornering, 'harshCornering'));
+
+        // Linear fallback for events without specific thresholds mapped
+        const scoreLinearFallback = (countPer100: number, severity: number = 1) => {
+            const raw = 10 - (countPer100 * severity);
+            return Math.max(1, Math.min(10, raw));
+        };
+
+        addScore(weights.accelBrakeSwitch, scoreLinearFallback((counts.accelBrakeFastShift || 0) / distRatio, 0.5));
+        addScore(weights.accelDuringCruise, scoreLinearFallback((counts.accWithCCActive || 0) / distRatio, 0.5));
+        addScore(weights.noCruiseControl, scoreLinearFallback((counts.noCruise || 0) / distRatio, 0.1));
         
-        const p7 = (counts.accWithCCActive || 0) / distRatio * weights.accelDuringCruise * K;
-        const p8 = (counts.noCruise || 0) / distRatio * weights.noCruiseControl * K;
-
-        score -= (p1 + p2 + p3 + p4 + p5 + p6 + p7 + p8);
-
-        // Time-based metrics (excluded by default weights=0, but kept for custom weighting)
         const idlePerc = Math.abs(parseFloat(metrics.idleTimePerc) || 0);
-        if (weights.excessiveIdling > 0) {
-            // Include K in idling penalty to align with other criteria
-            score -= (idlePerc / 100) * weights.excessiveIdling * 10 * K;
-        }
+        addScore(weights.excessiveIdling, scoreLinearFallback(idlePerc, 0.5)); 
 
         const rpmPerc = Math.abs(parseFloat(metrics.highRPMPerc) || 0);
-        if (weights.highRPM > 0) {
-            score -= (rpmPerc / 100) * weights.highRPM * 10;
-        }
+        addScore(weights.highRPM, scoreLinearFallback(rpmPerc, 1.0));
 
-        return Math.max(0, Math.min(10, score));
+        if (totalWeight === 0) return 10.0;
+        
+        const finalScore = weightedScoreSum / totalWeight;
+        return Math.max(1, Math.min(10, finalScore));
     }
 
     private weightsAreDefault(weights: ScoringWeights): boolean {
@@ -173,7 +257,7 @@ export class ScoringEngine {
             paramIdx++;
         }
 
-        const weights = options?.weights || DEFAULT_WEIGHTS;
+        const weights = options?.weights || this.currentWeights;
 
         try {
             const res = await pool.query(query, params);

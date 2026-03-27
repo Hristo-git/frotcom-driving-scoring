@@ -7,37 +7,40 @@ dotenv.config({ path: path.join(__dirname, '..', '.env.local') });
 
 async function verifyCalibration() {
     const engine = new ScoringEngine();
+    engine.setProfile('frotcom_personalized');
     
     const targets = [
-        { id: 337, name: 'Живко Георгиев Иванов - Петрич', start: '2026-02-14', end: '2026-02-15', target: 4.3, type: 'Highway' },
-        { id: 181, name: 'Lyuben Vasilev - Петрич', start: '2026-03-01', end: '2026-03-26', target: 4.6, type: 'City/Mixed' },
-        { id: 148, name: '*Stefan Serafimov-Петрич', start: '2026-03-01', end: '2026-03-26', target: 9.0, type: 'Highway/Mixed' }
+        { id: 337, name: 'Zhivko (Zhivko Georgiev Ivanov - Petrich)', start: '2026-03-01', end: '2026-03-27', target: 4.3, type: 'Highway (Month)' },
+        { id: 243, name: 'Lyuben (Lyuben Vasilev-Petrich)', start: '2026-03-01', end: '2026-03-10', target: 4.8, type: '768km Segment' },
+        { id: 181, name: 'Lyuben (Lyuben Vasilev - Petrich)', start: '2026-03-01', end: '2026-03-27', target: 4.6, type: 'Mixed (Month)' },
+        { id: 148, name: '*Stefan Serafimov-Petrich', start: '2026-03-01', end: '2026-03-27', target: 9.0, type: 'Highway/Mixed' }
     ];
 
-    console.log('--- Scoring Calibration Verification ---');
-    console.log('Thresholds: Cornering(3.36), Accel(1.25), Braking(-2.2)');
-    console.log('Formula: K = 1.24 * (avgSpeed / 83)\n');
-
-    for (const test of targets) {
-        // Fetch performance for the specific driver
-        const results = await engine.getDriverPerformance(test.start, test.end, { driverIds: [test.id] });
-        const driver = results[0];
-
-        if (driver) {
-            const avgSpeed = driver.drivingTime > 0 ? (driver.distance / (driver.drivingTime / 3600)) : 0;
-            console.log(`Driver: ${driver.driverName}`);
-            console.log(`  Type: ${test.type} (Target: ${test.target})`);
-            console.log(`  Avg Speed: ${avgSpeed.toFixed(1)} km/h`);
-            console.log(`  Calculated Score: ${driver.score}`);
-            console.log(`  Distance: ${driver.distance} km`);
-            console.log(`  Events: Cornering(${driver.events.lateralAcceleration || 0}), Accel(${ (driver.events.lowSpeedAcceleration || 0) + (driver.events.highSpeedAcceleration || 0) }), Brake(${ (driver.events.lowSpeedBreak || 0) + (driver.events.highSpeedBreak || 0) })`);
-            const diff = Math.abs(driver.score - test.target);
-            console.log(`  Status: ${diff <= 0.2 ? '✅ MATCH' : '❌ MISMATCH (Diff: ' + diff.toFixed(2) + ')'}`);
-            console.log('------------------------------------');
-        } else {
-            console.log(`Driver NOT FOUND: ${test.name}`);
+    console.log('--- Scoring Calibration Verification (Official Weights) ---');
+    
+    for (const t of targets) {
+        const results = await engine.getDriverPerformance(t.start, t.end, { driverIds: [t.id] });
+        if (results.length === 0) {
+            console.log(`Driver NOT FOUND: ${t.name}`);
+            continue;
         }
+
+        const res = results[0];
+        const diff = Math.abs(res.score - t.target);
+        const status = diff <= 0.2 ? '✅ MATCH' : '❌ MISMATCH';
+
+        console.log(`Driver: ${res.driverName}`);
+        console.log(`  Type: ${t.type} (Target: ${t.target})`);
+        console.log(`  Avg Speed: ${(res.distance / (res.drivingTime / 3600)).toFixed(1)} km/h`);
+        console.log(`  Calculated Score: ${res.score}`);
+        console.log(`  Distance: ${res.distance} km`);
+        console.log(`  Events: Cornering(${res.events.lateralAcceleration || 0}), AccelLow(${res.events.lowSpeedAcceleration || 0}), AccelHigh(${res.events.highSpeedAcceleration || 0}), BrakeLow(${res.events.lowSpeedBreak || 0}), BrakeHigh(${res.events.highSpeedBreak || 0})`);
+        console.log(`  Pedal Switch: ${res.events.accelBrakeFastShift || 0}, CC Accel: ${res.events.accWithCCActive || 0}, Idling: ${res.idling}%`);
+        console.log(`  Status: ${status} (Diff: ${diff.toFixed(2)})`);
+        console.log('------------------------------------');
     }
+
+    process.exit(0);
 }
 
 verifyCalibration().catch(console.error);
