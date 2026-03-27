@@ -50,13 +50,13 @@ export interface VehiclePerformance {
 }
 
 export const DEFAULT_WEIGHTS: ScoringWeights = {
-    harshAccelerationLow: 1.29,
-    harshAccelerationHigh: 1.42,
-    harshBrakingLow: 1.47,
-    harshBrakingHigh: 0.81,
-    harshCornering: 1.16,
+    harshAccelerationLow: 2.50,
+    harshAccelerationHigh: 1.50,
+    harshBrakingLow: 2.04,
+    harshBrakingHigh: 1.51,
+    harshCornering: 0.64,
     accelBrakeSwitch: 0.00,
-    excessiveIdling: 1.04,
+    excessiveIdling: 2.59,
     highRPM: 0.00,
     alarms: 0.00,
     noCruiseControl: 0.05,
@@ -96,12 +96,12 @@ export const RECOMMENDATION_LABELS: Record<number, string> = {
 };
 
 const CALIBRATION = {
-    m_accelLow: 0.5501, f_accelLow: 1.4374,
-    m_accelHigh: 0.3043, f_accelHigh: 1.3921,
-    m_brakeLow: 0.8589, f_brakeLow: 1.7657,
-    m_brakeHigh: 0.2310, f_brakeHigh: 1.4096,
-    m_corner: 0.2494, f_corner: 1.4155,
-    m_idle: 0.5559, f_idle: 1.7550
+    m_accelLow: 1.9653, f_accelLow: 1.1385,
+    m_accelHigh: 0.5237, f_accelHigh: 1.3317,
+    m_brakeLow: 1.7726, f_brakeLow: 1.1232,
+    m_brakeHigh: 0.8924, f_brakeHigh: 0.7088,
+    m_corner: 2.7775, f_corner: 1.9860,
+    m_idle: 1.1462, f_idle: 1.4941
 };
 
 function getScoreExp(val: number, m10: number, factor: number): number {
