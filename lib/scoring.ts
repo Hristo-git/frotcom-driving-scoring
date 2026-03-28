@@ -50,13 +50,13 @@ export interface VehiclePerformance {
 }
 
 export const DEFAULT_WEIGHTS: ScoringWeights = {
-    harshAccelerationLow: 2.16,
-    harshAccelerationHigh: 1.75,
-    harshBrakingLow: 1.38,
-    harshBrakingHigh: 1.52,
-    harshCornering: 0.46,
+    harshAccelerationLow: 2.58,
+    harshAccelerationHigh: 1.31,
+    harshBrakingLow: 1.28,
+    harshBrakingHigh: 1.31,
+    harshCornering: 0.52,
     accelBrakeSwitch: 0.00,
-    excessiveIdling: 1.79,
+    excessiveIdling: 2.12,
     highRPM: 0.00,
     alarms: 0.00,
     noCruiseControl: 0.01,
@@ -96,12 +96,12 @@ export const RECOMMENDATION_LABELS: Record<number, string> = {
 };
 
 const CALIBRATION = {
-    m_accelLow: 0.8780, f_accelLow: 1.3355,
-    m_accelHigh: 0.5003, f_accelHigh: 1.4875,
-    m_brakeLow: 1.5367, f_brakeLow: 1.2797,
-    m_brakeHigh: 1.0265, f_brakeHigh: 1.0620,
-    m_corner: 1.7280, f_corner: 1.2082,
-    m_idle: 7.9352, f_idle: 1.1222
+    m_accelLow: 0.9711, f_accelLow: 1.2681,
+    m_accelHigh: 0.5127, f_accelHigh: 1.4789,
+    m_brakeLow: 1.4700, f_brakeLow: 1.4453,
+    m_brakeHigh: 0.9451, f_brakeHigh: 0.7223,
+    m_corner: 0.9242, f_corner: 1.0695,
+    m_idle: 8.4424, f_idle: 1.1051
 };
 
 function getScoreExp(val: number, m10: number, factor: number): number {
@@ -304,8 +304,8 @@ export class ScoringEngine {
                 SELECT 
                     driver_id, event_type, COUNT(*) as count
                 FROM ecodriving_events
-                WHERE started_at >= ($1::timestamptz AT TIME ZONE 'Europe/Sofia')
-                  AND started_at <= ($2::timestamptz AT TIME ZONE 'Europe/Sofia')
+                WHERE started_at >= $1::timestamptz
+                  AND started_at <= $2::timestamptz
                   AND (
                     (event_type = 'lateralAcceleration' AND acceleration >= 3.36) OR
                     (event_type IN ('lowSpeedAcceleration', 'highSpeedAcceleration') AND acceleration >= 1.25) OR
