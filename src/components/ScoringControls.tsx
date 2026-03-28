@@ -21,6 +21,7 @@ interface ScoringControlsProps {
     weights: ScoringWeights;
     onChange: (weights: ScoringWeights) => void;
     onApply: () => void;
+    onReset: () => void;
 }
 
 const criteria = [
@@ -37,7 +38,7 @@ const criteria = [
     { key: 'accelDuringCruise', label: 'Ускорение по време на използване на круиз контрол', Icon: IconAccelCruise },
 ] as const;
 
-export default function ScoringControls({ weights, onChange, onApply }: ScoringControlsProps) {
+export default function ScoringControls({ weights, onChange, onApply, onReset }: ScoringControlsProps) {
     const handleSliderChange = (key: keyof ScoringWeights, value: string) => {
         onChange({ ...weights, [key]: parseFloat(value) });
     };
@@ -185,6 +186,22 @@ export default function ScoringControls({ weights, onChange, onApply }: ScoringC
                     </span>
                 </div>
                 <div className={styles.scoringActions} style={{ display: 'flex', gap: '12px' }}>
+                    <button
+                        onClick={onReset}
+                        style={{
+                            padding: '10px 20px',
+                            backgroundColor: '#f8fafc',
+                            color: '#475569',
+                            border: '1px solid #e2e8f0',
+                            borderRadius: '4px',
+                            cursor: 'pointer',
+                            fontWeight: 600,
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '6px'
+                        }}>
+                        <span>🔄</span> ВЪЗСТАНОВИ СТАНДАРТНИТЕ
+                    </button>
                     <button
                         onClick={() => window.location.reload()}
                         style={{

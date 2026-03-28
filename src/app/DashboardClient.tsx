@@ -3,7 +3,7 @@
 import React, { useState } from 'react';
 import styles from './dashboard.module.css';
 import { useRouter } from 'next/navigation';
-import type { PerformanceReport, AggregatedPerformance, ScoringWeights, VehiclePerformance } from '../../lib/scoring';
+import { PerformanceReport, AggregatedPerformance, ScoringWeights, VehiclePerformance, DEFAULT_WEIGHTS } from '../../lib/scoring';
 import ScoringControls from '../components/ScoringControls';
 // Import dynamic with no SSR for Leaflet map to avoid window is not defined errors
 import dynamic from 'next/dynamic';
@@ -95,10 +95,10 @@ export default function DashboardClient({
         params.set('start', `${start}T00:00:00.000Z`);
         params.set('end', `${end}T23:59:59.999Z`);
 
-        selectedCountry.forEach(c => params.append('country', c));
-        selectedWarehouse.forEach(w => params.append('warehouse', w));
-        selectedBrand.forEach(b => params.append('brand', b));
-        selectedModel.forEach(m => params.append('model', m));
+        if (selectedCountry.length > 0) selectedCountry.forEach(c => params.append('country', c));
+        if (selectedWarehouse.length > 0) selectedWarehouse.forEach(w => params.append('warehouse', w));
+        if (selectedBrand.length > 0) selectedBrand.forEach(b => params.append('brand', b));
+        if (selectedModel.length > 0) selectedModel.forEach(m => params.append('model', m));
 
         // Add weights
         Object.entries(currentWeights).forEach(([key, val]) => {
@@ -115,6 +115,19 @@ export default function DashboardClient({
 
         router.push(`/?${params.toString()}`);
         if (view === 'settings') setView('report');
+    };
+
+    const handleResetWeights = () => {
+        setCurrentWeights(DEFAULT_WEIGHTS);
+        
+        // Clear weight params from URL
+        const params = new URLSearchParams(window.location.search);
+        ['hal', 'hah', 'hbl', 'hbh', 'hc', 'abs', 'ei', 'hr', 'al', 'ncc', 'adc'].forEach(key => {
+            params.delete(key);
+        });
+        
+        router.push(`/?${params.toString()}`);
+        // stay in settings view to see the change
     };
 
     const toggleFilter = (type: 'country' | 'warehouse' | 'brand' | 'model', value: string) => {
@@ -455,6 +468,7 @@ export default function DashboardClient({
                     weights={currentWeights}
                     onChange={setCurrentWeights}
                     onApply={handleApplyFilter}
+                    onReset={handleResetWeights}
                 />
             ) : view === 'vehicles' ? (
                 <div style={{ padding: '20px 0' }}>
