@@ -153,7 +153,7 @@ export class ScoringEngine {
             LEFT JOIN countries c ON d.country_id = c.id
             LEFT JOIN warehouses w ON d.warehouse_id = w.id
             WHERE DATE((es.period_start AT TIME ZONE 'UTC') AT TIME ZONE 'Europe/Sofia') >= $1::date
-              AND DATE((es.period_end AT TIME ZONE 'UTC') AT TIME ZONE 'Europe/Sofia') <= $2::date
+              AND DATE((es.period_start AT TIME ZONE 'UTC') AT TIME ZONE 'Europe/Sofia') <= $2::date
         `;
 
         const params: any[] = [start, end];
@@ -237,6 +237,7 @@ export class ScoringEngine {
                     });
                 }
 
+                // Initial event counts from metrics (will be overwritten/supplemented by raw data)
                 if (row.metrics.eventCounts) {
                     for (const [key, val] of Object.entries(row.metrics.eventCounts)) {
                         d.events[key] = (d.events[key] || 0) + (val as number);
@@ -245,18 +246,13 @@ export class ScoringEngine {
             });
 
             // Fetch thresholded granular events for custom scoring
+            // Inclusion of all event types found in the Frotcom ecodriving events table
             const eventQuery = `
                 SELECT 
                     driver_id, event_type, COUNT(*) as count
                 FROM ecodriving_events
                 WHERE DATE((started_at AT TIME ZONE 'UTC') AT TIME ZONE 'Europe/Sofia')
                       BETWEEN $1::date AND $2::date
-                  AND (
-                    (event_type = 'lateralAcceleration' AND acceleration >= 3.36) OR
-                    (event_type IN ('lowSpeedAcceleration', 'highSpeedAcceleration') AND acceleration >= 1.25) OR
-                    (event_type IN ('lowSpeedBreak', 'highSpeedBreak') AND acceleration <= -2.2) OR
-                    (event_type IN ('idling', 'accelBrakeFastShift', 'accWithCCActive', 'noCruise'))
-                  )
                 GROUP BY driver_id, event_type
             `;
             const eventRes = await pool.query(eventQuery, [start, end]);
