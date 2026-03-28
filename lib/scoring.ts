@@ -50,13 +50,13 @@ export interface VehiclePerformance {
 }
 
 export const DEFAULT_WEIGHTS: ScoringWeights = {
-    harshAccelerationLow: 2.58,
-    harshAccelerationHigh: 1.31,
-    harshBrakingLow: 1.28,
-    harshBrakingHigh: 1.31,
-    harshCornering: 0.52,
+    harshAccelerationLow: 2.69,
+    harshAccelerationHigh: 1.37,
+    harshBrakingLow: 1.33,
+    harshBrakingHigh: 1.37,
+    harshCornering: 0.54,
     accelBrakeSwitch: 0.00,
-    excessiveIdling: 2.12,
+    excessiveIdling: 2.22,
     highRPM: 0.00,
     alarms: 0.00,
     noCruiseControl: 0.01,
@@ -96,12 +96,12 @@ export const RECOMMENDATION_LABELS: Record<number, string> = {
 };
 
 const CALIBRATION = {
-    m_accelLow: 0.9711, f_accelLow: 1.2681,
-    m_accelHigh: 0.5127, f_accelHigh: 1.4789,
-    m_brakeLow: 1.4700, f_brakeLow: 1.4453,
-    m_brakeHigh: 0.9451, f_brakeHigh: 0.7223,
-    m_corner: 0.9242, f_corner: 1.0695,
-    m_idle: 8.4424, f_idle: 1.1051
+    m_accelLow: 1.0143, f_accelLow: 1.2417,
+    m_accelHigh: 0.5360, f_accelHigh: 1.4997,
+    m_brakeLow: 2.0271, f_brakeLow: 1.1339,
+    m_brakeHigh: 2.2554, f_brakeHigh: 0.3213,
+    m_corner: 0.8990, f_corner: 1.5588,
+    m_idle: 8.3842, f_idle: 1.0945
 };
 
 function getScoreExp(val: number, m10: number, factor: number): number {
@@ -201,9 +201,9 @@ export class ScoringEngine {
             LEFT JOIN countries c ON d.country_id = c.id
             LEFT JOIN warehouses w ON d.warehouse_id = w.id
             WHERE DATE((es.period_start AT TIME ZONE 'UTC') AT TIME ZONE 'Europe/Sofia')
-                  >= DATE($1::timestamptz AT TIME ZONE 'Europe/Sofia')
+                  >= $1::date
               AND DATE((es.period_end AT TIME ZONE 'UTC') AT TIME ZONE 'Europe/Sofia')
-                  <= DATE($2::timestamptz AT TIME ZONE 'Europe/Sofia')
+                  <= $2::date
         `;
 
         const params: any[] = [start, end];
@@ -304,8 +304,8 @@ export class ScoringEngine {
                 SELECT 
                     driver_id, event_type, COUNT(*) as count
                 FROM ecodriving_events
-                WHERE started_at >= $1::timestamptz
-                  AND started_at <= $2::timestamptz
+                WHERE DATE((started_at AT TIME ZONE 'UTC') AT TIME ZONE 'Europe/Sofia')
+                      BETWEEN $1::date AND $2::date
                   AND (
                     (event_type = 'lateralAcceleration' AND acceleration >= 3.36) OR
                     (event_type IN ('lowSpeedAcceleration', 'highSpeedAcceleration') AND acceleration >= 1.25) OR
