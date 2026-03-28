@@ -3,7 +3,7 @@
 import React, { useState } from 'react';
 import styles from './dashboard.module.css';
 import { useRouter } from 'next/navigation';
-import { PerformanceReport, AggregatedPerformance, ScoringWeights, VehiclePerformance, DEFAULT_WEIGHTS } from '../../lib/scoring';
+import { PerformanceReport, AggregatedPerformance, ScoringWeights, VehiclePerformance, DEFAULT_WEIGHTS } from '../../lib/scoring-types';
 import ScoringControls from '../components/ScoringControls';
 // Import dynamic with no SSR for Leaflet map to avoid window is not defined errors
 import dynamic from 'next/dynamic';

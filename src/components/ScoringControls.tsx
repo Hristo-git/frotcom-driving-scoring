@@ -1,7 +1,7 @@
 'use client';
 
 import React from 'react';
-import type { ScoringWeights } from '../../lib/scoring';
+import type { ScoringWeights } from '../../lib/scoring-types';
 import styles from '../app/dashboard.module.css';
 import {
     IconAccelLow,
