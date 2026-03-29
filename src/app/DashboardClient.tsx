@@ -3,8 +3,7 @@
 import React, { useState } from 'react';
 import styles from './dashboard.module.css';
 import { useRouter } from 'next/navigation';
-import { PerformanceReport, AggregatedPerformance, ScoringWeights, VehiclePerformance, DEFAULT_WEIGHTS } from '../../lib/scoring-types';
-import ScoringControls from '../components/ScoringControls';
+import { PerformanceReport, AggregatedPerformance, ScoringWeights, VehiclePerformance } from '../../lib/scoring-types';
 // Import dynamic with no SSR for Leaflet map to avoid window is not defined errors
 import dynamic from 'next/dynamic';
 import WarehouseChart from '../components/WarehouseChart';
@@ -83,13 +82,27 @@ export default function DashboardClient({
     const [start, setStart] = useState(startDate.split('T')[0]);
     const [end, setEnd] = useState(endDate.split('T')[0]);
     const [mode, setMode] = useState<'single' | 'range'>('range');
-    const [currentWeights, setCurrentWeights] = useState<ScoringWeights>(weights);
+    const [currentWeights] = useState<ScoringWeights>(weights);
     const [view, setView] = useState<'report' | 'vehicles' | 'drivers'>('report');
 
     const [expandedDriver, setExpandedDriver] = useState<number | null>(null);
     const [driverSortField, setDriverSortField] = useState<string>('score');
     const [driverSortOrder, setDriverSortOrder] = useState<'asc' | 'desc'>('desc');
-    const [filterOpen, setFilterOpen] = useState(false);
+
+    const applyWithDates = (newStart: string, newEnd: string) => {
+        const params = new URLSearchParams();
+        params.set('start', `${newStart}T00:00:00.000Z`);
+        params.set('end', `${newEnd}T23:59:59.999Z`);
+        if (selectedCountry.length > 0) selectedCountry.forEach(c => params.append('country', c));
+        if (selectedWarehouse.length > 0) selectedWarehouse.forEach(w => params.append('warehouse', w));
+        if (selectedBrand.length > 0) selectedBrand.forEach(b => params.append('brand', b));
+        if (selectedModel.length > 0) selectedModel.forEach(m => params.append('model', m));
+        Object.entries(currentWeights).forEach(([key, val]) => {
+            const shortKey = ({ harshAccelerationLow: 'hal', harshAccelerationHigh: 'hah', harshBrakingLow: 'hbl', harshBrakingHigh: 'hbh', harshCornering: 'hc', accelBrakeSwitch: 'abs', excessiveIdling: 'ei', highRPM: 'hr', alarms: 'al', noCruiseControl: 'ncc', accelDuringCruise: 'adc' } as any)[key];
+            if (shortKey) params.set(shortKey, (val as number).toString());
+        });
+        router.push(`/?${params.toString()}`);
+    };
 
     const handleApplyFilter = () => {
         const params = new URLSearchParams();
@@ -115,19 +128,6 @@ export default function DashboardClient({
         });
 
         router.push(`/?${params.toString()}`);
-    };
-
-    const handleResetWeights = () => {
-        setCurrentWeights(DEFAULT_WEIGHTS);
-        
-        // Clear weight params from URL
-        const params = new URLSearchParams(window.location.search);
-        ['hal', 'hah', 'hbl', 'hbh', 'hc', 'abs', 'ei', 'hr', 'al', 'ncc', 'adc'].forEach(key => {
-            params.delete(key);
-        });
-        
-        router.push(`/?${params.toString()}`);
-        // stay in settings view to see the change
     };
 
     const toggleFilter = (type: 'country' | 'warehouse' | 'brand' | 'model', value: string) => {
@@ -454,14 +454,17 @@ export default function DashboardClient({
                         <label><input type="radio" checked={mode === 'range'} onChange={() => setMode('range')} /> Период</label>
                     </div>
                     <input type="date" className={styles.filterInput} value={start}
-                        onChange={(e) => { setStart(e.target.value); if (mode === 'single') setEnd(e.target.value); }}
-                        onBlur={handleApplyFilter} />
+                        onChange={(e) => {
+                            const v = e.target.value;
+                            setStart(v);
+                            if (mode === 'single') { setEnd(v); applyWithDates(v, v); }
+                            else applyWithDates(v, end);
+                        }} />
                     {mode === 'range' && (
                         <>
                             <span className={styles.dateSep}>—</span>
                             <input type="date" className={styles.filterInput} value={end}
-                                onChange={(e) => setEnd(e.target.value)}
-                                onBlur={handleApplyFilter} />
+                                onChange={(e) => { setEnd(e.target.value); applyWithDates(start, e.target.value); }} />
                         </>
                     )}
                     <button className={styles.button} onClick={handleApplyFilter}>Обнови</button>

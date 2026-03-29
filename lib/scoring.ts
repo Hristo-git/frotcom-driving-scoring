@@ -509,10 +509,15 @@ export class ScoringEngine {
             FROM (
                 SELECT
                     jsonb_array_elements_text(es.metrics->'vehicles') AS plate,
-                    CAST(es.metrics->>'mileage' AS NUMERIC) AS driver_mileage,
-                    es.overall_score * CAST(es.metrics->>'mileage' AS NUMERIC) AS weighted_score,
+                    -- Divide mileage equally across all vehicles the driver used
+                    -- to avoid counting the same km multiple times
+                    CAST(es.metrics->>'mileage' AS NUMERIC)
+                        / GREATEST(jsonb_array_length(es.metrics->'vehicles'), 1) AS driver_mileage,
+                    es.overall_score * CAST(es.metrics->>'mileage' AS NUMERIC)
+                        / GREATEST(jsonb_array_length(es.metrics->'vehicles'), 1) AS weighted_score,
                     COALESCE(CAST(NULLIF(es.metrics->>'averageConsumption', 'null') AS NUMERIC), 0)
-                        * CAST(es.metrics->>'mileage' AS NUMERIC) AS weighted_consumption,
+                        * CAST(es.metrics->>'mileage' AS NUMERIC)
+                        / GREATEST(jsonb_array_length(es.metrics->'vehicles'), 1) AS weighted_consumption,
                     c.name AS country_name,
                     w.name AS warehouse_name
                 FROM ecodriving_scores es
