@@ -84,11 +84,12 @@ export default function DashboardClient({
     const [end, setEnd] = useState(endDate.split('T')[0]);
     const [mode, setMode] = useState<'single' | 'range'>('range');
     const [currentWeights, setCurrentWeights] = useState<ScoringWeights>(weights);
-    const [view, setView] = useState<'report' | 'settings' | 'vehicles' | 'drivers'>('report');
+    const [view, setView] = useState<'report' | 'vehicles' | 'drivers'>('report');
 
     const [expandedDriver, setExpandedDriver] = useState<number | null>(null);
     const [driverSortField, setDriverSortField] = useState<string>('score');
     const [driverSortOrder, setDriverSortOrder] = useState<'asc' | 'desc'>('desc');
+    const [filterOpen, setFilterOpen] = useState(false);
 
     const handleApplyFilter = () => {
         const params = new URLSearchParams();
@@ -114,7 +115,6 @@ export default function DashboardClient({
         });
 
         router.push(`/?${params.toString()}`);
-        if (view === 'settings') setView('report');
     };
 
     const handleResetWeights = () => {
@@ -390,87 +390,99 @@ export default function DashboardClient({
         </React.Fragment>
     );
 
+    const activeFilterCount = selectedCountry.length + selectedWarehouse.length;
+
     return (
         <div className={styles.container}>
-            <header className={styles.header}>
-                <div>
-                    <h1 className={styles.title}>Driver Scoring Dashboard</h1>
-                    <div style={{ color: '#94a3b8', fontSize: '14px', marginTop: '4px' }}>
+            {/* ── TOP BAR ── */}
+            <header className={styles.topBar}>
+                <div className={styles.brandArea}>
+                    <h1 className={styles.title}>Driver<br className={styles.titleBreak} /> Scoring Dashboard</h1>
+                    <div className={styles.subtitle}>
                         {activeDrivers} шофьори • {totalDistance.toLocaleString('bg-BG')} km общо
                     </div>
                 </div>
 
-                <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
-                    <div className={styles.navTabs}>
-                        <button
-                            className={`${styles.navTab} ${view === 'report' ? styles.navTabActive : ''}`}
-                            onClick={() => setView('report')}
-                        >Отчети</button>
-                        <button
-                            className={`${styles.navTab} ${view === 'vehicles' ? styles.navTabActive : ''}`}
-                            onClick={() => setView('vehicles')}
-                        >Автомобили</button>
-                        <button
-                            className={`${styles.navTab} ${view === 'drivers' ? styles.navTabActive : ''}`}
-                            onClick={() => setView('drivers')}
-                        >Шофьори</button>
-                        <button
-                            className={`${styles.navTab} ${view === 'settings' ? styles.navTabActive : ''}`}
-                            onClick={() => setView('settings')}
-                        >Настройки</button>
-                    </div>
-
-                    <div className={styles.filters}>
-                        <div className={styles.modeToggle}>
-                            <label><input type="radio" checked={mode === 'single'} onChange={() => { setMode('single'); setEnd(start); }} /> Ден</label>
-                            <label><input type="radio" checked={mode === 'range'} onChange={() => setMode('range')} /> Период</label>
-                        </div>
-
-                        <input
-                            type="date"
-                            className={styles.filterInput}
-                            value={start}
-                            onChange={(e) => { setStart(e.target.value); if (mode === 'single') setEnd(e.target.value); }}
-                        />
-                        {mode === 'range' && (
-                            <>
-                                <span style={{ color: '#94a3b8' }}>—</span>
-                                <input
-                                    type="date"
-                                    className={styles.filterInput}
-                                    value={end}
-                                    onChange={(e) => setEnd(e.target.value)}
-                                />
-                            </>
-                        )}
-                        <button className={styles.button} onClick={handleApplyFilter}>Обнови</button>
-                    </div>
-                </div>
-
-                <div className={styles.filterBadgeContainer}>
-                    {selectedCountry && (
-                        <div className={styles.filterBadge}>
-                            <span>Град: {selectedCountry}</span>
-                            <button onClick={() => removeFilter('country')}>×</button>
-                        </div>
-                    )}
-                    {selectedWarehouse && (
-                        <div className={styles.filterBadge}>
-                            <span>Склад: {selectedWarehouse}</span>
-                            <button onClick={() => removeFilter('warehouse')}>×</button>
-                        </div>
-                    )}
-                </div>
+                {/* Desktop nav */}
+                <nav className={styles.navTabs}>
+                    <button className={`${styles.navTab} ${view === 'report' ? styles.navTabActive : ''}`} onClick={() => setView('report')}>Отчети</button>
+                    <button className={`${styles.navTab} ${view === 'vehicles' ? styles.navTabActive : ''}`} onClick={() => setView('vehicles')}>Автомобили</button>
+                    <button className={`${styles.navTab} ${view === 'drivers' ? styles.navTabActive : ''}`} onClick={() => setView('drivers')}>Шофьори</button>
+                </nav>
             </header>
 
-            {view === 'settings' ? (
-                <ScoringControls
-                    weights={currentWeights}
-                    onChange={setCurrentWeights}
-                    onApply={handleApplyFilter}
-                    onReset={handleResetWeights}
-                />
-            ) : view === 'vehicles' ? (
+            {/* ── FILTER BAR ── */}
+            <div className={styles.filterBar}>
+                {/* City chips */}
+                <div className={styles.cityChips}>
+                    <button
+                        className={`${styles.chip} ${selectedCountry.length === 0 ? styles.chipActive : ''}`}
+                        onClick={() => removeFilter('country')}
+                    >Всички</button>
+                    {countries.map(c => (
+                        <button
+                            key={c.name}
+                            className={`${styles.chip} ${selectedCountry.includes(c.name) ? styles.chipActive : ''}`}
+                            onClick={() => toggleFilter('country', c.name)}
+                        >
+                            {c.name}
+                            <span className={styles.chipCount}>{c.driversCount}</span>
+                        </button>
+                    ))}
+                </div>
+
+                {/* Date range + refresh */}
+                <div className={styles.dateSection}>
+                    <div className={styles.modeToggle}>
+                        <label><input type="radio" checked={mode === 'single'} onChange={() => { setMode('single'); setEnd(start); }} /> Ден</label>
+                        <label><input type="radio" checked={mode === 'range'} onChange={() => setMode('range')} /> Период</label>
+                    </div>
+                    <input type="date" className={styles.filterInput} value={start} onChange={(e) => { setStart(e.target.value); if (mode === 'single') setEnd(e.target.value); }} />
+                    {mode === 'range' && (
+                        <>
+                            <span className={styles.dateSep}>—</span>
+                            <input type="date" className={styles.filterInput} value={end} onChange={(e) => setEnd(e.target.value)} />
+                        </>
+                    )}
+                    <button className={styles.button} onClick={handleApplyFilter}>Обнови</button>
+                </div>
+            </div>
+
+            {/* Active filter badges */}
+            {activeFilterCount > 0 && (
+                <div className={styles.filterBadgeContainer}>
+                    {selectedCountry.length > 0 && selectedCountry.map(c => (
+                        <div key={c} className={styles.filterBadge}>
+                            <span>Град: {c}</span>
+                            <button onClick={() => toggleFilter('country', c)}>×</button>
+                        </div>
+                    ))}
+                    {selectedWarehouse.length > 0 && selectedWarehouse.map(w => (
+                        <div key={w} className={styles.filterBadge}>
+                            <span>Склад: {w}</span>
+                            <button onClick={() => toggleFilter('warehouse', w)}>×</button>
+                        </div>
+                    ))}
+                </div>
+            )}
+
+            {/* ── BOTTOM NAV (mobile only) ── */}
+            <nav className={styles.bottomNav}>
+                <button className={`${styles.bottomNavItem} ${view === 'report' ? styles.bottomNavActive : ''}`} onClick={() => setView('report')}>
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
+                    <span>Отчети</span>
+                </button>
+                <button className={`${styles.bottomNavItem} ${view === 'vehicles' ? styles.bottomNavActive : ''}`} onClick={() => setView('vehicles')}>
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M5 17H3a2 2 0 01-2-2V5a2 2 0 012-2h11a2 2 0 012 2v3"/><rect x="9" y="11" width="14" height="10" rx="2"/><circle cx="12" cy="21" r="1"/><circle cx="20" cy="21" r="1"/></svg>
+                    <span>Автомобили</span>
+                </button>
+                <button className={`${styles.bottomNavItem} ${view === 'drivers' ? styles.bottomNavActive : ''}`} onClick={() => setView('drivers')}>
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87"/><path d="M16 3.13a4 4 0 010 7.75"/></svg>
+                    <span>Шофьори</span>
+                </button>
+            </nav>
+
+            {view === 'vehicles' ? (
                 <div style={{ padding: '20px 0' }}>
                     {(() => {
                         const totalDist = filteredVehicles.reduce((acc, v) => acc + (v.distance || 0), 0);
@@ -503,25 +515,7 @@ export default function DashboardClient({
                     })()}
 
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', marginBottom: '32px' }}>
-                        {/* 1. City Filter as Large Tiles */}
-                        <div className={styles.filterGroup}>
-                            <div className={styles.filterLabel}>Град</div>
-                            <div className={styles.filterTileContainer}>
-                                <div
-                                    className={`${styles.filterTile} ${selectedCountry.length === 0 ? styles.filterTileActive : ''}`}
-                                    onClick={() => removeFilter('country')}
-                                >Всички</div>
-                                {countries.map(c => (
-                                    <div
-                                        key={c.name}
-                                        className={`${styles.filterTile} ${selectedCountry.includes(c.name) ? styles.filterTileActive : ''}`}
-                                        onClick={() => toggleFilter('country', c.name)}
-                                    >{c.name}</div>
-                                ))}
-                            </div>
-                        </div>
-
-                        {/* 2. Brand Filter as Large Tiles */}
+                        {/* Brand Filter */}
                         <div className={styles.filterGroup}>
                             <div className={styles.filterLabel}>Марка</div>
                             <div className={styles.filterTileContainer}>

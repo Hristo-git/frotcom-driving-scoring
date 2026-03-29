@@ -39,7 +39,7 @@ async function inferCountryFromName(name: string, countriesMap: Map<string, numb
                     `INSERT INTO countries (name) VALUES ($1) ON CONFLICT (name) DO UPDATE SET name=EXCLUDED.name RETURNING id`,
                     [country]
                 );
-                id = res.rows[0].id;
+                id = res.rows[0].id as number;
                 countriesMap.set(country, id);
             }
             return id!;
