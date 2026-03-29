@@ -497,38 +497,47 @@ export class ScoringEngine {
         // We sum the driver's mileage attributed to each vehicle proportionally — but since
         // the API only gives total mileage per driver (not per vehicle), we use the driver's
         // full mileage for score/consumption weighting and show it per-vehicle as a best estimate.
+        // Expand the vehicles JSON array in a subquery first, then join vehicles table
         let query = `
             SELECT
-                plate,
-                manufacturer,
-                model,
-                SUM(driver_mileage) AS total_distance,
-                SUM(weighted_score) AS weighted_score,
-                SUM(weighted_consumption) AS weighted_consumption
+                sub.plate,
+                v.metadata->>'manufacturer' AS manufacturer,
+                v.metadata->>'model' AS model,
+                SUM(sub.driver_mileage) AS total_distance,
+                SUM(sub.weighted_score) AS weighted_score,
+                SUM(sub.weighted_consumption) AS weighted_consumption
             FROM (
                 SELECT
                     jsonb_array_elements_text(es.metrics->'vehicles') AS plate,
-                    v.metadata->>'manufacturer' AS manufacturer,
-                    v.metadata->>'model' AS model,
                     CAST(es.metrics->>'mileage' AS NUMERIC) AS driver_mileage,
                     es.overall_score * CAST(es.metrics->>'mileage' AS NUMERIC) AS weighted_score,
-                    COALESCE(CAST(NULLIF(es.metrics->>'averageConsumption','null') AS NUMERIC), 0)
-                        * CAST(es.metrics->>'mileage' AS NUMERIC) AS weighted_consumption
+                    COALESCE(CAST(NULLIF(es.metrics->>'averageConsumption', 'null') AS NUMERIC), 0)
+                        * CAST(es.metrics->>'mileage' AS NUMERIC) AS weighted_consumption,
+                    c.name AS country_name,
+                    w.name AS warehouse_name
                 FROM ecodriving_scores es
                 JOIN drivers d ON es.driver_id = d.id
                 LEFT JOIN countries c ON d.country_id = c.id
                 LEFT JOIN warehouses w ON d.warehouse_id = w.id
-                LEFT JOIN vehicles v ON v.license_plate = jsonb_array_elements_text(es.metrics->'vehicles')
                 WHERE es.period_start::date = $1::date
                   AND es.period_end::date = $2::date
                   AND (es.metrics->>'isPeriodSummary')::boolean = true
                   AND CAST(es.metrics->>'mileage' AS NUMERIC) > 0
             ) sub
-            GROUP BY plate, manufacturer, model
-            ORDER BY total_distance DESC
+            LEFT JOIN vehicles v ON v.license_plate = sub.plate
         `;
+        const params: any[] = [start.substring(0, 10), end.substring(0, 10)];
+        let paramIdx = 3;
+        if (options?.countryNames?.length)  { query += ` WHERE sub.country_name = ANY($${paramIdx}::text[])`; params.push(options.countryNames); paramIdx++; }
+        if (options?.warehouseNames?.length) {
+            query += options?.countryNames?.length ? ` AND` : ` WHERE`;
+            query += ` sub.warehouse_name = ANY($${paramIdx}::text[])`;
+            params.push(options.warehouseNames); paramIdx++;
+        }
+        query += ` GROUP BY sub.plate, manufacturer, model ORDER BY total_distance DESC`;
+
         try {
-            const res = await pool.query(query, [start, end]);
+            const res = await pool.query(query, params);
             return res.rows.map(row => ({
                 licensePlate: row.plate,
                 manufacturer: row.manufacturer || 'Unknown',
