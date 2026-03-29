@@ -151,12 +151,19 @@ export class ScoringEngine {
     }
 
     async getDriverPerformance(start: string, end: string, options?: { countryNames?: string[], warehouseNames?: string[], weights?: ScoringWeights, driverIds?: number[] }): Promise<PerformanceReport[]> {
-        // ── Try live Frotcom API first; fall back to DB on any failure ──
+        // ── DB-first: use cached period-summary rows (exact Frotcom scores stored by cron).
+        //    Only call live API if no period-summary exists for the requested range.
+        const dbResult = await this._getDriverPerformanceFromDB(start, end, options);
+        if (dbResult.length > 0) {
+            return dbResult;
+        }
+        // No cached data — try live Frotcom API
+        console.log('[getDriverPerformance] No period-summary in DB, trying live API...');
         try {
             return await this._getDriverPerformanceFromAPI(start, end, options);
         } catch (apiError) {
-            console.error('[getDriverPerformance] Frotcom API failed, falling back to DB:', apiError);
-            return this._getDriverPerformanceFromDB(start, end, options);
+            console.error('[getDriverPerformance] Live API also failed, falling back to daily aggregation:', apiError);
+            return this._getDriverPerformanceFromDailyDB(start, end, options);
         }
     }
 
@@ -288,8 +295,8 @@ export class ScoringEngine {
         // Prefer period-summary rows written by fetchAndStorePeriodScores (isPeriodSummary=true).
         // These are exact Frotcom period scores cached by the cron job.
         // Fall back to aggregating daily rows only when no period-summary exists.
-        // Use date-based matching (Sofia timezone) to avoid UTC offset issues:
-        // e.g. '2026-03-01T00:00:00+00:00' is stored as '2026-02-28 22:00:00 UTC' by Postgres.
+        // Match period-summary rows by date only (not exact timestamp).
+        // The column stores e.g. '2026-03-01 00:00:00' literally; ::date extracts '2026-03-01'.
         const startDate = start.substring(0, 10);
         const endDate   = end.substring(0, 10);
 
@@ -302,8 +309,8 @@ export class ScoringEngine {
             JOIN drivers d ON es.driver_id = d.id
             LEFT JOIN countries c ON d.country_id = c.id
             LEFT JOIN warehouses w ON d.warehouse_id = w.id
-            WHERE DATE((es.period_start AT TIME ZONE 'UTC') AT TIME ZONE 'Europe/Sofia') = $1::date
-              AND DATE((es.period_end   AT TIME ZONE 'UTC') AT TIME ZONE 'Europe/Sofia') = $2::date
+            WHERE es.period_start::date = $1::date
+              AND es.period_end::date = $2::date
               AND (es.metrics->>'isPeriodSummary')::boolean = true
         `;
         const params: any[] = [startDate, endDate];
