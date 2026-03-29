@@ -4,6 +4,7 @@ import DashboardClient from './DashboardClient';
 // import { unstable_noStore as noStore } from 'next/cache'; // Optional based on caching needs
 
 export const dynamic = 'force-dynamic';
+export const maxDuration = 60; // seconds — needed for Frotcom API call (~15s for 176 drivers)
 
 export default async function DashboardPage(props: {
     searchParams?: Promise<{ [key: string]: string | string[] | undefined }>;
