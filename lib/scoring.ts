@@ -349,7 +349,7 @@ export class ScoringEngine {
             distance:        parseFloat((parseFloat(row.metrics.mileage) || 0).toFixed(1)),
             drivingTime:     Math.round(parseFloat(row.metrics.drivingTime) || 0),
             idling:          parseFloat((parseFloat(row.metrics.idleTimePerc) || 0).toFixed(2)),
-            consumption:     0,
+            consumption:     parseFloat((parseFloat(row.metrics.averageConsumption) || 0).toFixed(2)),
             rpm:             parseFloat((parseFloat(row.metrics.highRPMPerc) || 0).toFixed(2)),
             vehicles:        Array.isArray(row.metrics.vehicles) ? row.metrics.vehicles : [],
             recommendations: Array.isArray(row.metrics.failingCriteria) ? row.metrics.failingCriteria : [],

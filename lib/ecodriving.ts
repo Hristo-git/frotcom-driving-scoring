@@ -384,6 +384,7 @@ export async function fetchAndStorePeriodScores(start: string, end: string) {
                 drivingTime: record.drivingTime || 0,
                 idleTimePerc: record.idleTimePerc ?? null,
                 highRPMPerc: record.highRPMPerc ?? null,
+                averageConsumption: record.averageConsumption ?? null,
                 score,
                 isPeriodSummary: true,
                 vehicles: Array.isArray(record.vehicles) ? record.vehicles : (record.licensePlate ? [record.licensePlate] : []),
