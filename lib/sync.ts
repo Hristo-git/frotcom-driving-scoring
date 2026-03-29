@@ -12,6 +12,42 @@ function sanitize(str: string | undefined): string {
     return str.replace(/\u0000/g, '').trim();
 }
 
+// Keywords in driver names → country name fallback when Frotcom has no segment set
+const NAME_COUNTRY_KEYWORDS: { pattern: RegExp; country: string }[] = [
+    { pattern: /Ямбол\s*Щафет|Щафет/i,  country: 'Ямбол Щафетни' },
+    { pattern: /Ямбол/i,                 country: 'Ямбол' },
+    { pattern: /Столник|Механик/i,       country: 'Столник' },
+    { pattern: /Петрич/i,                country: 'Петрич' },
+    { pattern: /Пловдив/i,               country: 'Пловдив' },
+    { pattern: /Плевен/i,                country: 'Плевен' },
+    { pattern: /Русе/i,                  country: 'Русе' },
+    { pattern: /Варна/i,                 country: 'Варна' },
+    { pattern: /Видин/i,                 country: 'Видин' },
+    { pattern: /Skopje|Скопие/i,         country: 'Skopje' },
+    { pattern: /Bucharest/i,             country: 'Bucharest' },
+    { pattern: /Chi[sș]in[aă]u/i,       country: 'Chișinău' },
+    { pattern: /Moldova/i,               country: 'Moldova' },
+    { pattern: /Автотранспорт/i,         country: 'Столник' },
+];
+
+async function inferCountryFromName(name: string, countriesMap: Map<string, number>): Promise<number | null> {
+    for (const { pattern, country } of NAME_COUNTRY_KEYWORDS) {
+        if (pattern.test(name)) {
+            let id = countriesMap.get(country);
+            if (!id) {
+                const res = await pool.query(
+                    `INSERT INTO countries (name) VALUES ($1) ON CONFLICT (name) DO UPDATE SET name=EXCLUDED.name RETURNING id`,
+                    [country]
+                );
+                id = res.rows[0].id;
+                countriesMap.set(country, id);
+            }
+            return id!;
+        }
+    }
+    return null;
+}
+
 export async function syncDriversAndVehicles() {
     console.log('Starting synchronization...');
 
@@ -52,17 +88,19 @@ export async function syncDriversAndVehicles() {
                 warehousesMap.set(driver.department, warehouseRes.rows[0].id);
             }
 
-            const countryId = driver.segment ? countriesMap.get(driver.segment) : null;
+            const frotcomCountryId = driver.segment ? countriesMap.get(driver.segment) : null;
             const warehouseId = driver.department ? warehousesMap.get(driver.department) : null;
+            // If Frotcom has no segment, infer country from driver name
+            const countryId = frotcomCountryId ?? await inferCountryFromName(sanitize(driver.name), countriesMap);
 
-            // Sync Driver
+            // Sync Driver — only update country_id when we have one (don't overwrite with NULL)
             await pool.query(
-                `INSERT INTO drivers (name, frotcom_id, country_id, warehouse_id, metadata) 
+                `INSERT INTO drivers (name, frotcom_id, country_id, warehouse_id, metadata)
                  VALUES ($1, $2, $3, $4, $5)
-                 ON CONFLICT (frotcom_id) DO UPDATE SET 
+                 ON CONFLICT (frotcom_id) DO UPDATE SET
                     name = EXCLUDED.name,
-                    country_id = EXCLUDED.country_id,
-                    warehouse_id = EXCLUDED.warehouse_id,
+                    country_id = COALESCE(EXCLUDED.country_id, drivers.country_id),
+                    warehouse_id = COALESCE(EXCLUDED.warehouse_id, drivers.warehouse_id),
                     metadata = EXCLUDED.metadata`,
                 [
                     sanitize(driver.name),
