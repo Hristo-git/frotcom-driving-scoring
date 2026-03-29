@@ -151,142 +151,225 @@ export class ScoringEngine {
     }
 
     async getDriverPerformance(start: string, end: string, options?: { countryNames?: string[], warehouseNames?: string[], weights?: ScoringWeights, driverIds?: number[] }): Promise<PerformanceReport[]> {
+        // ── Try live Frotcom API first; fall back to DB on any failure ──
         try {
-            // ── 1. Driver metadata from DB (country, warehouse, frotcom_id mapping) ──
-            const metaRes = await pool.query(`
-                SELECT d.id, d.frotcom_id, d.name,
-                       c.name as country, w.name as warehouse,
-                       c.id as country_id, w.id as warehouse_id
-                FROM drivers d
-                LEFT JOIN countries c ON d.country_id = c.id
-                LEFT JOIN warehouses w ON d.warehouse_id = w.id
-            `);
+            return await this._getDriverPerformanceFromAPI(start, end, options);
+        } catch (apiError) {
+            console.error('[getDriverPerformance] Frotcom API failed, falling back to DB:', apiError);
+            return this._getDriverPerformanceFromDB(start, end, options);
+        }
+    }
 
-            // frotcom_id → { internalId, name, country, warehouse, ... }
-            const driverMeta = new Map<string, any>();
-            // internalId → same object (for event lookup)
-            const driverMetaById = new Map<number, any>();
-            metaRes.rows.forEach(row => {
-                const meta = {
-                    internalId: row.id,
-                    frotcomId: row.frotcom_id?.toString(),
-                    name: row.name,
-                    country: row.country || 'Other',
-                    warehouse: row.warehouse || 'Other',
-                    countryId: row.country_id,
-                    warehouseId: row.warehouse_id,
-                };
-                if (meta.frotcomId) driverMeta.set(meta.frotcomId, meta);
-                driverMetaById.set(meta.internalId, meta);
-            });
+    private async _getDriverPerformanceFromAPI(start: string, end: string, options?: { countryNames?: string[], warehouseNames?: string[], weights?: ScoringWeights, driverIds?: number[] }): Promise<PerformanceReport[]> {
+        // ── 1. Driver metadata from DB ──
+        const metaRes = await pool.query(`
+            SELECT d.id, d.frotcom_id, d.name,
+                   c.name as country, w.name as warehouse,
+                   c.id as country_id, w.id as warehouse_id
+            FROM drivers d
+            LEFT JOIN countries c ON d.country_id = c.id
+            LEFT JOIN warehouses w ON d.warehouse_id = w.id
+        `);
 
-            // ── 2. Fetch scores directly from Frotcom API for the exact period ──
-            const frotcomRecords = await FrotcomClient.calculateEcodriving(start, end, undefined, undefined, 'driver');
+        const driverMeta = new Map<string, any>();
+        metaRes.rows.forEach(row => {
+            const meta = {
+                internalId: row.id,
+                frotcomId: row.frotcom_id?.toString(),
+                name: row.name,
+                country: row.country || 'Other',
+                warehouse: row.warehouse || 'Other',
+                countryId: row.country_id,
+                warehouseId: row.warehouse_id,
+            };
+            if (meta.frotcomId) driverMeta.set(meta.frotcomId, meta);
+        });
 
-            const driverMap = new Map<number, any>();
+        // ── 2. Fetch scores from Frotcom API for the exact period ──
+        const frotcomRecords = await FrotcomClient.calculateEcodriving(start, end, undefined, undefined, 'driver');
+        if (!frotcomRecords.length) throw new Error('Frotcom API returned 0 records');
 
-            for (const record of frotcomRecords) {
-                if (!record.driverId) continue;
-                const meta = driverMeta.get(record.driverId.toString());
-                if (!meta) continue;
+        const driverMap = new Map<number, any>();
 
-                // Apply filters
-                if (options?.driverIds && !options.driverIds.includes(meta.internalId)) continue;
-                if (options?.countryNames?.length && !options.countryNames.includes(meta.country)) continue;
-                if (options?.warehouseNames?.length && !options.warehouseNames.includes(meta.warehouse)) continue;
+        for (const record of frotcomRecords) {
+            if (!record.driverId) continue;
+            const meta = driverMeta.get(record.driverId.toString());
+            if (!meta) continue;
 
-                const mileage = (record.mileageCanbus !== undefined && record.mileageCanbus !== null)
-                    ? record.mileageCanbus
-                    : (record.mileageGps || 0);
+            if (options?.driverIds && !options.driverIds.includes(meta.internalId)) continue;
+            if (options?.countryNames?.length && !options.countryNames.includes(meta.country)) continue;
+            if (options?.warehouseNames?.length && !options.warehouseNames.includes(meta.warehouse)) continue;
 
-                if (!driverMap.has(meta.internalId)) {
-                    driverMap.set(meta.internalId, {
-                        internalId: meta.internalId,
-                        name: meta.name,
-                        country: meta.country,
-                        warehouse: meta.warehouse,
-                        countryId: meta.countryId,
-                        warehouseId: meta.warehouseId,
-                        totalDistance: 0,
-                        totalDistanceForWeights: 0,
-                        totalDrivingTime: 0,
-                        totalIdlingWeighted: 0,
-                        totalConsumptionWeighted: 0,
-                        totalRPMWeighted: 0,
-                        totalScoreWeighted: 0,
-                        vehicles: new Set<string>(),
-                        recommendations: new Set<string>(),
-                        events: {} as Record<string, number>,
-                        count: 0,
-                    });
-                }
+            const mileage = (record.mileageCanbus !== undefined && record.mileageCanbus !== null)
+                ? record.mileageCanbus
+                : (record.mileageGps || 0);
 
-                const d = driverMap.get(meta.internalId);
-                // Use scoreCustomized — matches the Frotcom dashboard (uses configured weights)
-                const scoreVal = parseFloat(record.scoreCustomized ?? record.score);
-
-                if (mileage > 0) {
-                    if (!isNaN(scoreVal))           d.totalScoreWeighted     += scoreVal * mileage;
-                    const idleVal = parseFloat(record.idleTimePerc);
-                    if (!isNaN(idleVal))             d.totalIdlingWeighted    += idleVal * mileage;
-                    const rpmVal  = parseFloat(record.highRPMPerc);
-                    if (!isNaN(rpmVal))              d.totalRPMWeighted       += rpmVal  * mileage;
-                    const consVal = parseFloat(record.totalConsumption);
-                    const avgCons = mileage > 0 && !isNaN(consVal) ? (consVal / mileage) * 100 : 0;
-                    d.totalConsumptionWeighted += avgCons * mileage;
-                    d.totalDistanceForWeights  += mileage;
-                    d.count++;
-                }
-
-                d.totalDistance    += mileage;
-                d.totalDrivingTime += (record.drivingTime || 0);
-
-                if (record.licensePlate) d.vehicles.add(record.licensePlate);
-                if (Array.isArray(record.vehicles)) record.vehicles.forEach((p: string) => d.vehicles.add(p));
-
-                (record.recommendations || []).forEach((id: number) => {
-                    const label = RECOMMENDATION_LABELS[id];
-                    if (label) d.recommendations.add(label);
+            if (!driverMap.has(meta.internalId)) {
+                driverMap.set(meta.internalId, {
+                    internalId: meta.internalId,
+                    name: meta.name,
+                    country: meta.country,
+                    warehouse: meta.warehouse,
+                    countryId: meta.countryId,
+                    warehouseId: meta.warehouseId,
+                    totalDistance: 0,
+                    totalDistanceForWeights: 0,
+                    totalDrivingTime: 0,
+                    totalIdlingWeighted: 0,
+                    totalConsumptionWeighted: 0,
+                    totalRPMWeighted: 0,
+                    totalScoreWeighted: 0,
+                    vehicles: new Set<string>(),
+                    recommendations: new Set<string>(),
+                    events: {} as Record<string, number>,
+                    count: 0,
                 });
             }
 
-            // ── 3. Fetch granular events for display ──
-            const eventRes = await pool.query(`
-                SELECT driver_id, event_type, COUNT(*) as count
-                FROM ecodriving_events
-                WHERE DATE((started_at AT TIME ZONE 'UTC') AT TIME ZONE 'Europe/Sofia')
-                      BETWEEN $1::date AND $2::date
-                GROUP BY driver_id, event_type
-            `, [start, end]);
+            const d = driverMap.get(meta.internalId);
+            const scoreVal = parseFloat(record.scoreCustomized ?? record.score);
 
-            eventRes.rows.forEach((ev: any) => {
-                const d = driverMap.get(ev.driver_id);
-                if (d) d.events[ev.event_type] = parseInt(ev.count);
+            if (mileage > 0) {
+                if (!isNaN(scoreVal))  d.totalScoreWeighted       += scoreVal * mileage;
+                const idleVal = parseFloat(record.idleTimePerc);
+                if (!isNaN(idleVal))   d.totalIdlingWeighted       += idleVal * mileage;
+                const rpmVal  = parseFloat(record.highRPMPerc);
+                if (!isNaN(rpmVal))    d.totalRPMWeighted          += rpmVal  * mileage;
+                const consVal = parseFloat(record.totalConsumption);
+                const avgCons = !isNaN(consVal) ? (consVal / mileage) * 100 : 0;
+                d.totalConsumptionWeighted += avgCons * mileage;
+                d.totalDistanceForWeights  += mileage;
+                d.count++;
+            }
+            d.totalDistance    += mileage;
+            d.totalDrivingTime += (record.drivingTime || 0);
+            if (record.licensePlate) d.vehicles.add(record.licensePlate);
+            if (Array.isArray(record.vehicles)) record.vehicles.forEach((p: string) => d.vehicles.add(p));
+            (record.recommendations || []).forEach((id: number) => {
+                const label = RECOMMENDATION_LABELS[id];
+                if (label) d.recommendations.add(label);
             });
-
-            return Array.from(driverMap.values()).map(d => ({
-                driverId:      d.internalId,
-                driverName:    d.name,
-                country:       d.country,
-                warehouse:     d.warehouse,
-                countryId:     d.countryId,
-                warehouseId:   d.warehouseId,
-                score:         parseFloat((d.totalDistanceForWeights > 0 ? d.totalScoreWeighted / d.totalDistanceForWeights : 0).toFixed(2)),
-                distance:      parseFloat(d.totalDistance.toFixed(1)),
-                drivingTime:   Math.round(d.totalDrivingTime),
-                idling:        d.totalDistanceForWeights > 0 ? parseFloat((d.totalIdlingWeighted / d.totalDistanceForWeights).toFixed(2)) : 0,
-                consumption:   d.totalDistanceForWeights > 0 ? parseFloat((d.totalConsumptionWeighted / d.totalDistanceForWeights).toFixed(2)) : 0,
-                rpm:           d.totalDistanceForWeights > 0 ? parseFloat((d.totalRPMWeighted / d.totalDistanceForWeights).toFixed(2)) : 0,
-                vehicles:      Array.from(d.vehicles) as string[],
-                recommendations: Array.from(d.recommendations) as string[],
-                dataPoints:    d.count,
-                events:        d.events,
-            })).sort((a, b) => b.score - a.score);
-
-        } catch (error) {
-            console.error('Error in getDriverPerformance:', error);
-            return [];
         }
+
+        // ── 3. Granular events for display ──
+        const eventRes = await pool.query(`
+            SELECT driver_id, event_type, COUNT(*) as count
+            FROM ecodriving_events
+            WHERE DATE((started_at AT TIME ZONE 'UTC') AT TIME ZONE 'Europe/Sofia')
+                  BETWEEN $1::date AND $2::date
+            GROUP BY driver_id, event_type
+        `, [start, end]);
+        eventRes.rows.forEach((ev: any) => {
+            const d = driverMap.get(ev.driver_id);
+            if (d) d.events[ev.event_type] = parseInt(ev.count);
+        });
+
+        return Array.from(driverMap.values()).map(d => ({
+            driverId:        d.internalId,
+            driverName:      d.name,
+            country:         d.country,
+            warehouse:       d.warehouse,
+            countryId:       d.countryId,
+            warehouseId:     d.warehouseId,
+            score:           parseFloat((d.totalDistanceForWeights > 0 ? d.totalScoreWeighted / d.totalDistanceForWeights : 0).toFixed(2)),
+            distance:        parseFloat(d.totalDistance.toFixed(1)),
+            drivingTime:     Math.round(d.totalDrivingTime),
+            idling:          d.totalDistanceForWeights > 0 ? parseFloat((d.totalIdlingWeighted / d.totalDistanceForWeights).toFixed(2)) : 0,
+            consumption:     d.totalDistanceForWeights > 0 ? parseFloat((d.totalConsumptionWeighted / d.totalDistanceForWeights).toFixed(2)) : 0,
+            rpm:             d.totalDistanceForWeights > 0 ? parseFloat((d.totalRPMWeighted / d.totalDistanceForWeights).toFixed(2)) : 0,
+            vehicles:        Array.from(d.vehicles) as string[],
+            recommendations: Array.from(d.recommendations) as string[],
+            dataPoints:      d.count,
+            events:          d.events,
+        })).sort((a, b) => b.score - a.score);
+    }
+
+    private async _getDriverPerformanceFromDB(start: string, end: string, options?: { countryNames?: string[], warehouseNames?: string[], weights?: ScoringWeights, driverIds?: number[] }): Promise<PerformanceReport[]> {
+        let query = `
+            SELECT
+                d.id as driver_id, d.name, c.name as country, w.name as warehouse,
+                c.id as country_id, w.id as warehouse_id,
+                es.overall_score, es.metrics
+            FROM ecodriving_scores es
+            JOIN drivers d ON es.driver_id = d.id
+            LEFT JOIN countries c ON d.country_id = c.id
+            LEFT JOIN warehouses w ON d.warehouse_id = w.id
+            WHERE DATE((es.period_start AT TIME ZONE 'UTC') AT TIME ZONE 'Europe/Sofia') >= $1::date
+              AND DATE((es.period_start AT TIME ZONE 'UTC') AT TIME ZONE 'Europe/Sofia') <= $2::date
+        `;
+        const params: any[] = [start, end];
+        let paramIdx = 3;
+        if (options?.countryNames?.length)  { query += ` AND c.name = ANY($${paramIdx}::text[])`; params.push(options.countryNames);  paramIdx++; }
+        if (options?.warehouseNames?.length) { query += ` AND w.name = ANY($${paramIdx}::text[])`; params.push(options.warehouseNames); paramIdx++; }
+        if (options?.driverIds?.length)      { query += ` AND d.id = ANY($${paramIdx}::int[])`;   params.push(options.driverIds);      paramIdx++; }
+
+        const res = await pool.query(query, params);
+        const driverMap = new Map<number, any>();
+
+        res.rows.forEach(row => {
+            const driverId  = row.driver_id;
+            const distance  = parseFloat(row.metrics.mileage) || 0;
+            const storedScore = parseFloat(row.overall_score) || 0;
+            const rowVehicles: string[] = Array.isArray(row.metrics.vehicles) ? row.metrics.vehicles : [];
+
+            if (!driverMap.has(driverId)) {
+                driverMap.set(driverId, {
+                    driver_id: driverId, name: row.name,
+                    country: row.country, warehouse: row.warehouse,
+                    country_id: row.country_id, warehouse_id: row.warehouse_id,
+                    totalDistance: 0, totalDistanceForWeights: 0,
+                    totalDrivingTime: 0, totalIdlingWeighted: 0,
+                    totalConsumptionWeighted: 0, totalRPMWeighted: 0,
+                    totalScoreWeighted: 0,
+                    vehicles: new Set<string>(), recommendations: new Set<string>(),
+                    events: {} as Record<string, number>, count: 0,
+                });
+            }
+            const d = driverMap.get(driverId);
+            if (distance > 0) {
+                d.totalScoreWeighted       += storedScore * distance;
+                d.totalIdlingWeighted      += (parseFloat(row.metrics.idleTimePerc) || 0)       * distance;
+                d.totalConsumptionWeighted += (parseFloat(row.metrics.averageConsumption) || 0) * distance;
+                d.totalRPMWeighted         += (parseFloat(row.metrics.highRPMPerc) || 0)        * distance;
+                d.totalDistanceForWeights  += distance;
+                d.count++;
+            }
+            d.totalDistance    += distance;
+            d.totalDrivingTime += parseFloat(row.metrics.drivingTime) || 0;
+            rowVehicles.forEach((p: string) => d.vehicles.add(p));
+            if (Array.isArray(row.metrics.failingCriteria))
+                row.metrics.failingCriteria.forEach((c: string) => d.recommendations.add(c));
+        });
+
+        const eventRes = await pool.query(`
+            SELECT driver_id, event_type, COUNT(*) as count
+            FROM ecodriving_events
+            WHERE DATE((started_at AT TIME ZONE 'UTC') AT TIME ZONE 'Europe/Sofia') BETWEEN $1::date AND $2::date
+            GROUP BY driver_id, event_type
+        `, [start, end]);
+        eventRes.rows.forEach((ev: any) => {
+            const d = driverMap.get(ev.driver_id);
+            if (d) d.events[ev.event_type] = parseInt(ev.count);
+        });
+
+        return Array.from(driverMap.values()).map(d => ({
+            driverId:        d.driver_id,
+            driverName:      d.name,
+            country:         d.country || 'Other',
+            warehouse:       d.warehouse || 'Other',
+            countryId:       d.country_id,
+            warehouseId:     d.warehouse_id,
+            score:           parseFloat((d.totalDistanceForWeights > 0 ? d.totalScoreWeighted / d.totalDistanceForWeights : 0).toFixed(2)),
+            distance:        parseFloat(d.totalDistance.toFixed(1)),
+            drivingTime:     Math.round(d.totalDrivingTime),
+            idling:          d.totalDistanceForWeights > 0 ? parseFloat((d.totalIdlingWeighted / d.totalDistanceForWeights).toFixed(2)) : 0,
+            consumption:     d.totalDistanceForWeights > 0 ? parseFloat((d.totalConsumptionWeighted / d.totalDistanceForWeights).toFixed(2)) : 0,
+            rpm:             d.totalDistanceForWeights > 0 ? parseFloat((d.totalRPMWeighted / d.totalDistanceForWeights).toFixed(2)) : 0,
+            vehicles:        Array.from(d.vehicles) as string[],
+            recommendations: Array.from(d.recommendations) as string[],
+            dataPoints:      d.count,
+            events:          d.events,
+        })).sort((a, b) => b.score - a.score);
     }
 
     async getCountryPerformance(start: string, end: string, options?: { warehouseNames?: string[], weights?: ScoringWeights }): Promise<AggregatedPerformance[]> {
