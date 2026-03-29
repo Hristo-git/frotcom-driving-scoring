@@ -492,29 +492,45 @@ export class ScoringEngine {
     }
 
     async getVehiclePerformance(start: string, end: string, options?: { countryNames?: string[], warehouseNames?: string[], weights?: ScoringWeights }): Promise<VehiclePerformance[]> {
+        // Use period-summary rows (same source as driver tab) so km totals match.
+        // Each vehicle appears in the `vehicles` JSON array of the driver's period-summary row.
+        // We sum the driver's mileage attributed to each vehicle proportionally — but since
+        // the API only gives total mileage per driver (not per vehicle), we use the driver's
+        // full mileage for score/consumption weighting and show it per-vehicle as a best estimate.
         let query = `
-            SELECT 
-                v.license_plate,
-                v.metadata->>'manufacturer' as manufacturer,
-                v.metadata->>'model' as model,
-                COUNT(es.id) as trip_count,
-                SUM(CAST(es.metrics->>'mileage' AS NUMERIC)) as total_distance,
-                SUM(CAST(es.metrics->>'averageConsumption' AS NUMERIC) * CAST(es.metrics->>'mileage' AS NUMERIC)) as weighted_consumption,
-                SUM(es.overall_score * CAST(es.metrics->>'mileage' AS NUMERIC)) as weighted_score
-            FROM vehicles v
-            JOIN ecodriving_scores es ON v.license_plate IN (SELECT jsonb_array_elements_text(es.metrics->'vehicles'))
-            JOIN drivers d ON es.driver_id = d.id
-            LEFT JOIN countries c ON d.country_id = c.id
-            LEFT JOIN warehouses w ON d.warehouse_id = w.id
-            WHERE DATE((es.period_start AT TIME ZONE 'UTC') AT TIME ZONE 'Europe/Sofia') >= $1::date
-              AND DATE((es.period_end AT TIME ZONE 'UTC') AT TIME ZONE 'Europe/Sofia') <= $2::date
-            GROUP BY v.license_plate, manufacturer, model
-            ORDER BY weighted_score DESC
+            SELECT
+                plate,
+                manufacturer,
+                model,
+                SUM(driver_mileage) AS total_distance,
+                SUM(weighted_score) AS weighted_score,
+                SUM(weighted_consumption) AS weighted_consumption
+            FROM (
+                SELECT
+                    jsonb_array_elements_text(es.metrics->'vehicles') AS plate,
+                    v.metadata->>'manufacturer' AS manufacturer,
+                    v.metadata->>'model' AS model,
+                    CAST(es.metrics->>'mileage' AS NUMERIC) AS driver_mileage,
+                    es.overall_score * CAST(es.metrics->>'mileage' AS NUMERIC) AS weighted_score,
+                    COALESCE(CAST(NULLIF(es.metrics->>'averageConsumption','null') AS NUMERIC), 0)
+                        * CAST(es.metrics->>'mileage' AS NUMERIC) AS weighted_consumption
+                FROM ecodriving_scores es
+                JOIN drivers d ON es.driver_id = d.id
+                LEFT JOIN countries c ON d.country_id = c.id
+                LEFT JOIN warehouses w ON d.warehouse_id = w.id
+                LEFT JOIN vehicles v ON v.license_plate = jsonb_array_elements_text(es.metrics->'vehicles')
+                WHERE es.period_start::date = $1::date
+                  AND es.period_end::date = $2::date
+                  AND (es.metrics->>'isPeriodSummary')::boolean = true
+                  AND CAST(es.metrics->>'mileage' AS NUMERIC) > 0
+            ) sub
+            GROUP BY plate, manufacturer, model
+            ORDER BY total_distance DESC
         `;
         try {
             const res = await pool.query(query, [start, end]);
             return res.rows.map(row => ({
-                licensePlate: row.license_plate,
+                licensePlate: row.plate,
                 manufacturer: row.manufacturer || 'Unknown',
                 model: row.model || 'Unknown',
                 score: row.total_distance > 0 ? parseFloat((row.weighted_score / row.total_distance).toFixed(2)) : 0,

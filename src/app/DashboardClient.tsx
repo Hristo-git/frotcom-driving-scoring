@@ -171,6 +171,22 @@ export default function DashboardClient({
         return driverSortOrder === 'asc' ? '↑' : '↓';
     };
 
+    // Derive actionable recommendations from actual metric values
+    const deriveRecommendations = (d: PerformanceReport): string[] => {
+        if (d.recommendations && d.recommendations.length > 0) return d.recommendations;
+        const recs: string[] = [];
+        const km = d.distance || 0;
+        const ev = d.events || {};
+        const per100 = (n: number) => km > 0 ? (n / km) * 100 : 0;
+        if (per100((ev.lowSpeedAcceleration || ev.harshAccelerationLow || 0) as number) > 0.5) recs.push('harshAccelerationLow');
+        if (per100((ev.highSpeedAcceleration || ev.harshAccelerationHigh || 0) as number) > 0.3) recs.push('harshAccelerationHigh');
+        if (per100((ev.lowSpeedBreak || ev.harshBrakingLow || 0) as number) > 0.5)            recs.push('harshBrakingLow');
+        if (per100((ev.highSpeedBreak || ev.harshBrakingHigh || 0) as number) > 0.3)          recs.push('harshBrakingHigh');
+        if (d.idling > 25)  recs.push('excessiveIdling');
+        if (d.rpm > 8)      recs.push('highRPM');
+        return recs;
+    };
+
     const totalDistance = drivers.reduce((acc, d) => acc + (d.distance || 0), 0);
     const overallScore = totalDistance > 0
         ? (drivers.reduce((acc, d) => acc + (d.score * (d.distance || 0)), 0) / totalDistance).toFixed(2)
@@ -437,11 +453,15 @@ export default function DashboardClient({
                         <label><input type="radio" checked={mode === 'single'} onChange={() => { setMode('single'); setEnd(start); }} /> Ден</label>
                         <label><input type="radio" checked={mode === 'range'} onChange={() => setMode('range')} /> Период</label>
                     </div>
-                    <input type="date" className={styles.filterInput} value={start} onChange={(e) => { setStart(e.target.value); if (mode === 'single') setEnd(e.target.value); }} />
+                    <input type="date" className={styles.filterInput} value={start}
+                        onChange={(e) => { setStart(e.target.value); if (mode === 'single') setEnd(e.target.value); }}
+                        onBlur={handleApplyFilter} />
                     {mode === 'range' && (
                         <>
                             <span className={styles.dateSep}>—</span>
-                            <input type="date" className={styles.filterInput} value={end} onChange={(e) => setEnd(e.target.value)} />
+                            <input type="date" className={styles.filterInput} value={end}
+                                onChange={(e) => setEnd(e.target.value)}
+                                onBlur={handleApplyFilter} />
                         </>
                     )}
                     <button className={styles.button} onClick={handleApplyFilter}>Обнови</button>
@@ -668,36 +688,37 @@ export default function DashboardClient({
                                                             Препоръки за подобряване на представянето:
                                                         </div>
 
-                                                        {d.score >= 7.0 && (!d.recommendations || d.recommendations.length === 0) ? (
-                                                            <div style={{ color: '#10b981', display: 'flex', alignItems: 'center', gap: '10px', fontSize: '1.05em' }}>
-                                                                <span style={{ fontSize: '1.4em' }}>🏆</span>
-                                                                Браво! Шофирането е в отлични граници. Продължавай все така!
-                                                            </div>
-                                                        ) : (!d.recommendations || d.recommendations.length === 0) ? (
-                                                            <div style={{ color: '#94a3b8', display: 'flex', alignItems: 'center', gap: '10px', fontSize: '1.05em', fontStyle: 'italic' }}>
-                                                                <span style={{ fontSize: '1.4em' }}>📈</span>
-                                                                Продължавайте да следите показателите за още по-добри резултати.
-                                                            </div>
-                                                        ) : (
-                                                            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                                                                {d.recommendations.map((rec: string, i: number) => (
-                                                                    <div key={i} style={{
-                                                                        display: 'flex',
-                                                                        alignItems: 'center',
-                                                                        gap: '12px',
-                                                                        padding: '12px 16px',
-                                                                        background: 'rgba(255, 255, 255, 0.03)',
-                                                                        borderRadius: '8px',
-                                                                        border: '1px solid rgba(255, 255, 255, 0.05)'
-                                                                    }}>
-                                                                        <span style={{ color: '#f59e0b', fontSize: '1.2em' }}>💡</span>
-                                                                        <span style={{ color: '#f1f5f9', lineHeight: '1.4' }}>
-                                                                            {RECOMMENDATION_TRANSLATIONS[rec] || rec}
-                                                                        </span>
-                                                                    </div>
-                                                                ))}
-                                                            </div>
-                                                        )}
+                                                        {(() => {
+                                                            const recs = deriveRecommendations(d);
+                                                            if (d.score >= 7.0 && recs.length === 0) return (
+                                                                <div style={{ color: '#10b981', display: 'flex', alignItems: 'center', gap: '10px', fontSize: '1.05em' }}>
+                                                                    <span style={{ fontSize: '1.4em' }}>🏆</span>
+                                                                    Браво! Шофирането е в отлични граници. Продължавай все така!
+                                                                </div>
+                                                            );
+                                                            if (recs.length === 0) return (
+                                                                <div style={{ color: '#94a3b8', display: 'flex', alignItems: 'center', gap: '10px', fontSize: '1.05em', fontStyle: 'italic' }}>
+                                                                    <span style={{ fontSize: '1.4em' }}>📈</span>
+                                                                    Продължавайте да следите показателите за още по-добри резултати.
+                                                                </div>
+                                                            );
+                                                            return (
+                                                                <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                                                                    {recs.map((rec: string, i: number) => (
+                                                                        <div key={i} style={{
+                                                                            display: 'flex', alignItems: 'center', gap: '12px',
+                                                                            padding: '12px 16px', background: 'rgba(255, 255, 255, 0.03)',
+                                                                            borderRadius: '8px', border: '1px solid rgba(255, 255, 255, 0.05)'
+                                                                        }}>
+                                                                            <span style={{ color: '#f59e0b', fontSize: '1.2em' }}>💡</span>
+                                                                            <span style={{ color: '#f1f5f9', lineHeight: '1.4' }}>
+                                                                                {RECOMMENDATION_TRANSLATIONS[rec] || rec}
+                                                                            </span>
+                                                                        </div>
+                                                                    ))}
+                                                                </div>
+                                                            );
+                                                        })()}
 
                                                         <div style={{ marginTop: '20px', display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: '12px' }}>
                                                             <div style={{ background: 'rgba(255, 255, 255, 0.02)', padding: '10px', borderRadius: '6px', textAlign: 'center' }}>
