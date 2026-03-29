@@ -1,7 +1,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { syncDriversAndVehicles } from '../../../../../lib/sync';
-import { fetchAndStoreEcodriving } from '../../../../../lib/ecodriving';
+import { fetchAndStoreEcodriving, fetchAndStorePeriodScores } from '../../../../../lib/ecodriving';
 import { fetchAndStoreEcodrivingEvents } from '../../../../../lib/ecodriving-events';
 
 export const dynamic = 'force-dynamic';
@@ -41,6 +41,13 @@ export async function GET(request: NextRequest) {
             `${sofiaDate}T23:59:59`
         );
         console.log(`[Cron] Events sync finished: ${eventResult.stored} stored.`);
+
+        // 4. Sync period-level scores (month-to-date) — exact Frotcom period scores
+        // so the dashboard fallback path reads accurate cached values instead of
+        // aggregating daily rows (which diverges due to non-linear scoring).
+        const monthStart = sofiaDate.substring(0, 8) + '01'; // e.g. 2026-03-01
+        console.log(`[Cron] Step 4: Fetching period scores ${monthStart} → ${sofiaDate}`);
+        await fetchAndStorePeriodScores(monthStart, sofiaDate);
 
         return NextResponse.json({
             success: true,

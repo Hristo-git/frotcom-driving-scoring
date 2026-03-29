@@ -285,6 +285,70 @@ export class ScoringEngine {
     }
 
     private async _getDriverPerformanceFromDB(start: string, end: string, options?: { countryNames?: string[], warehouseNames?: string[], weights?: ScoringWeights, driverIds?: number[] }): Promise<PerformanceReport[]> {
+        // Prefer period-summary rows written by fetchAndStorePeriodScores (isPeriodSummary=true).
+        // These are exact Frotcom period scores cached by the cron job.
+        // Fall back to aggregating daily rows only when no period-summary exists.
+        const periodKey = `${start.substring(0, 10)}T00:00:00+00:00`;
+        const periodEnd  = `${end.substring(0, 10)}T23:59:59+00:00`;
+
+        let query = `
+            SELECT
+                d.id as driver_id, d.name, c.name as country, w.name as warehouse,
+                c.id as country_id, w.id as warehouse_id,
+                es.overall_score, es.metrics
+            FROM ecodriving_scores es
+            JOIN drivers d ON es.driver_id = d.id
+            LEFT JOIN countries c ON d.country_id = c.id
+            LEFT JOIN warehouses w ON d.warehouse_id = w.id
+            WHERE es.period_start = $1 AND es.period_end = $2
+              AND (es.metrics->>'isPeriodSummary')::boolean = true
+        `;
+        const params: any[] = [periodKey, periodEnd];
+        let paramIdx = 3;
+        if (options?.countryNames?.length)   { query += ` AND c.name = ANY($${paramIdx}::text[])`; params.push(options.countryNames);   paramIdx++; }
+        if (options?.warehouseNames?.length)  { query += ` AND w.name = ANY($${paramIdx}::text[])`; params.push(options.warehouseNames);  paramIdx++; }
+        if (options?.driverIds?.length)       { query += ` AND d.id = ANY($${paramIdx}::int[])`;    params.push(options.driverIds);        paramIdx++; }
+
+        const res = await pool.query(query, params);
+
+        // If no cached period summaries yet, fall back to daily aggregation
+        if (res.rows.length === 0) {
+            return this._getDriverPerformanceFromDailyDB(start, end, options);
+        }
+
+        const eventRes = await pool.query(`
+            SELECT driver_id, event_type, COUNT(*) as count
+            FROM ecodriving_events
+            WHERE DATE((started_at AT TIME ZONE 'UTC') AT TIME ZONE 'Europe/Sofia') BETWEEN $1::date AND $2::date
+            GROUP BY driver_id, event_type
+        `, [start, end]);
+        const evByDriver = new Map<number, Record<string, number>>();
+        eventRes.rows.forEach((ev: any) => {
+            if (!evByDriver.has(ev.driver_id)) evByDriver.set(ev.driver_id, {});
+            evByDriver.get(ev.driver_id)![ev.event_type] = parseInt(ev.count);
+        });
+
+        return res.rows.map(row => ({
+            driverId:        row.driver_id,
+            driverName:      row.name,
+            country:         row.country || 'Other',
+            warehouse:       row.warehouse || 'Other',
+            countryId:       row.country_id,
+            warehouseId:     row.warehouse_id,
+            score:           parseFloat(parseFloat(row.overall_score).toFixed(2)),
+            distance:        parseFloat((parseFloat(row.metrics.mileage) || 0).toFixed(1)),
+            drivingTime:     Math.round(parseFloat(row.metrics.drivingTime) || 0),
+            idling:          parseFloat((parseFloat(row.metrics.idleTimePerc) || 0).toFixed(2)),
+            consumption:     0,
+            rpm:             parseFloat((parseFloat(row.metrics.highRPMPerc) || 0).toFixed(2)),
+            vehicles:        Array.isArray(row.metrics.vehicles) ? row.metrics.vehicles : [],
+            recommendations: Array.isArray(row.metrics.failingCriteria) ? row.metrics.failingCriteria : [],
+            dataPoints:      1,
+            events:          evByDriver.get(row.driver_id) || {},
+        })).sort((a, b) => b.score - a.score);
+    }
+
+    private async _getDriverPerformanceFromDailyDB(start: string, end: string, options?: { countryNames?: string[], warehouseNames?: string[], weights?: ScoringWeights, driverIds?: number[] }): Promise<PerformanceReport[]> {
         let query = `
             SELECT
                 d.id as driver_id, d.name, c.name as country, w.name as warehouse,
@@ -296,19 +360,20 @@ export class ScoringEngine {
             LEFT JOIN warehouses w ON d.warehouse_id = w.id
             WHERE DATE((es.period_start AT TIME ZONE 'UTC') AT TIME ZONE 'Europe/Sofia') >= $1::date
               AND DATE((es.period_start AT TIME ZONE 'UTC') AT TIME ZONE 'Europe/Sofia') <= $2::date
+              AND (es.metrics->>'isPeriodSummary') IS NULL
         `;
         const params: any[] = [start, end];
         let paramIdx = 3;
-        if (options?.countryNames?.length)  { query += ` AND c.name = ANY($${paramIdx}::text[])`; params.push(options.countryNames);  paramIdx++; }
-        if (options?.warehouseNames?.length) { query += ` AND w.name = ANY($${paramIdx}::text[])`; params.push(options.warehouseNames); paramIdx++; }
-        if (options?.driverIds?.length)      { query += ` AND d.id = ANY($${paramIdx}::int[])`;   params.push(options.driverIds);      paramIdx++; }
+        if (options?.countryNames?.length)   { query += ` AND c.name = ANY($${paramIdx}::text[])`; params.push(options.countryNames);   paramIdx++; }
+        if (options?.warehouseNames?.length)  { query += ` AND w.name = ANY($${paramIdx}::text[])`; params.push(options.warehouseNames);  paramIdx++; }
+        if (options?.driverIds?.length)       { query += ` AND d.id = ANY($${paramIdx}::int[])`;    params.push(options.driverIds);        paramIdx++; }
 
         const res = await pool.query(query, params);
         const driverMap = new Map<number, any>();
 
         res.rows.forEach(row => {
-            const driverId  = row.driver_id;
-            const distance  = parseFloat(row.metrics.mileage) || 0;
+            const driverId    = row.driver_id;
+            const distance    = parseFloat(row.metrics.mileage) || 0;
             const storedScore = parseFloat(row.overall_score) || 0;
             const rowVehicles: string[] = Array.isArray(row.metrics.vehicles) ? row.metrics.vehicles : [];
 

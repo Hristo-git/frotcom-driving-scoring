@@ -346,3 +346,67 @@ export async function fetchAndStoreEcodriving(start: string, end: string) {
         console.error('Error fetching/storing ecodriving data:', error);
     }
 }
+
+/**
+ * Fetch Frotcom's period-level scores (full start→end in one API call) and
+ * upsert them as a single "period summary" row per driver using the special
+ * key period_start=start, period_end=end.
+ *
+ * This gives exact parity with the Frotcom dashboard for any date range,
+ * avoiding the aggregation bias from daily-score averaging.
+ */
+export async function fetchAndStorePeriodScores(start: string, end: string) {
+    console.log(`[PeriodSync] Fetching period scores ${start} → ${end}`);
+    try {
+        const driverMap = new Map<string, number>();
+        const driversRes = await pool.query('SELECT id, frotcom_id FROM drivers');
+        driversRes.rows.forEach((row: any) => {
+            driverMap.set(row.frotcom_id.toString(), row.id);
+        });
+
+        const records = await FrotcomClient.calculateEcodriving(start, end, undefined, undefined, 'driver');
+        console.log(`[PeriodSync] Got ${records.length} records from Frotcom API`);
+
+        let upserted = 0;
+        for (const record of records) {
+            if (!record.driverId) continue;
+            const internalId = driverMap.get(record.driverId.toString());
+            if (!internalId) continue;
+
+            const mileage = (record.mileageCanbus !== undefined && record.mileageCanbus !== null)
+                ? record.mileageCanbus
+                : (record.mileageGps || 0);
+
+            const score = parseFloat(record.scoreCustomized ?? record.score) || 0;
+            const metrics = {
+                mileage,
+                mileageGps: record.mileageGps || 0,
+                drivingTime: record.drivingTime || 0,
+                idleTimePerc: record.idleTimePerc ?? null,
+                highRPMPerc: record.highRPMPerc ?? null,
+                score,
+                isPeriodSummary: true,
+                vehicles: Array.isArray(record.vehicles) ? record.vehicles : (record.licensePlate ? [record.licensePlate] : []),
+            };
+
+            // Use a dedicated period-summary key: period_start = `${start}T00:00:00+PERIOD`
+            // so it never collides with daily rows but is easily queried.
+            const periodKey = `${start}T00:00:00+00:00`;
+            const periodEnd  = `${end}T23:59:59+00:00`;
+
+            await pool.query(
+                `INSERT INTO ecodriving_scores (driver_id, period_start, period_end, overall_score, metrics)
+                 VALUES ($1, $2, $3, $4, $5)
+                 ON CONFLICT (driver_id, period_start, period_end)
+                 DO UPDATE SET overall_score = EXCLUDED.overall_score,
+                               metrics = EXCLUDED.metrics,
+                               calculated_at = NOW()`,
+                [internalId, periodKey, periodEnd, score, JSON.stringify(metrics)]
+            );
+            upserted++;
+        }
+        console.log(`[PeriodSync] Upserted ${upserted} period-summary rows`);
+    } catch (error) {
+        console.error('[PeriodSync] Failed:', error);
+    }
+}
