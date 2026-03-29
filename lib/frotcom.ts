@@ -176,9 +176,12 @@ export class FrotcomClient {
     }
 
     static async calculateEcodriving(start: string, end: string, driverIds?: number[], vehicleIds?: number[], groupBy?: string): Promise<any[]> {
+        // If end is a bare date (YYYY-MM-DD), use end-of-day so the full day is included.
+        // Without this, '2026-03-27+02:00' means 00:00:00 — missing the entire day.
+        const endNorm = /^\d{4}-\d{2}-\d{2}$/.test(end) ? `${end}T23:59:59` : end;
         return this.request<any[]>('v2/ecodriving/calculate', 'POST', {
             from: toFrotcomLocal(start),
-            to: toFrotcomLocal(end),
+            to: toFrotcomLocal(endNorm),
             driverIds,
             vehicleIds,
             groupBy: groupBy || 'driver'
