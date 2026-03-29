@@ -288,8 +288,10 @@ export class ScoringEngine {
         // Prefer period-summary rows written by fetchAndStorePeriodScores (isPeriodSummary=true).
         // These are exact Frotcom period scores cached by the cron job.
         // Fall back to aggregating daily rows only when no period-summary exists.
-        const periodKey = `${start.substring(0, 10)}T00:00:00+00:00`;
-        const periodEnd  = `${end.substring(0, 10)}T23:59:59+00:00`;
+        // Use date-based matching (Sofia timezone) to avoid UTC offset issues:
+        // e.g. '2026-03-01T00:00:00+00:00' is stored as '2026-02-28 22:00:00 UTC' by Postgres.
+        const startDate = start.substring(0, 10);
+        const endDate   = end.substring(0, 10);
 
         let query = `
             SELECT
@@ -300,10 +302,11 @@ export class ScoringEngine {
             JOIN drivers d ON es.driver_id = d.id
             LEFT JOIN countries c ON d.country_id = c.id
             LEFT JOIN warehouses w ON d.warehouse_id = w.id
-            WHERE es.period_start = $1 AND es.period_end = $2
+            WHERE DATE((es.period_start AT TIME ZONE 'UTC') AT TIME ZONE 'Europe/Sofia') = $1::date
+              AND DATE((es.period_end   AT TIME ZONE 'UTC') AT TIME ZONE 'Europe/Sofia') = $2::date
               AND (es.metrics->>'isPeriodSummary')::boolean = true
         `;
-        const params: any[] = [periodKey, periodEnd];
+        const params: any[] = [startDate, endDate];
         let paramIdx = 3;
         if (options?.countryNames?.length)   { query += ` AND c.name = ANY($${paramIdx}::text[])`; params.push(options.countryNames);   paramIdx++; }
         if (options?.warehouseNames?.length)  { query += ` AND w.name = ANY($${paramIdx}::text[])`; params.push(options.warehouseNames);  paramIdx++; }
