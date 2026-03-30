@@ -8,6 +8,8 @@ import { VehiclePerformance } from '../../../lib/scoring-types';
 
 interface Props {
     vehicles: VehiclePerformance[];
+    selectedCategory?: string | null;
+    onCategoryClick?: (cat: string) => void;
 }
 
 function getCategory(plate: string): string {
@@ -45,7 +47,7 @@ const CustomTooltip = ({ active, payload, label }: any) => {
     return null;
 };
 
-export default function CategoryChart({ vehicles }: Props) {
+export default function CategoryChart({ vehicles, selectedCategory, onCategoryClick }: Props) {
     const data = useMemo(() => {
         const map = new Map<string, { km: number; weightedScore: number; weightedCons: number; consKm: number; count: number }>();
 
@@ -91,9 +93,18 @@ export default function CategoryChart({ vehicles }: Props) {
                 <XAxis dataKey="name" tick={{ fill: '#94a3b8', fontSize: 12 }} />
                 <YAxis domain={[0, 10]} tick={{ fill: '#94a3b8', fontSize: 12 }} tickCount={6} />
                 <Tooltip content={<CustomTooltip />} />
-                <Bar dataKey="score" radius={[6, 6, 0, 0]}>
+                <Bar
+                    dataKey="score"
+                    radius={[6, 6, 0, 0]}
+                    cursor="pointer"
+                    onClick={(d) => onCategoryClick?.(d.name)}
+                >
                     {data.map((entry) => (
-                        <Cell key={entry.name} fill={entry.fill} />
+                        <Cell
+                            key={entry.name}
+                            fill={entry.fill}
+                            opacity={!selectedCategory || selectedCategory === entry.name ? 1 : 0.35}
+                        />
                     ))}
                     <LabelList dataKey="score" position="top" formatter={(v: any) => typeof v === 'number' ? v.toFixed(2) : v} style={{ fill: '#cbd5e1', fontSize: 12, fontWeight: 700 }} />
                 </Bar>

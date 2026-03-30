@@ -93,6 +93,7 @@ export default function DashboardClient({
     const [view, setView] = useState<'report' | 'vehicles' | 'drivers'>('report');
 
     const [showCustomDate, setShowCustomDate] = useState(false);
+    const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
 
     const monthShortcuts = (() => {
         const now = new Date();
@@ -295,9 +296,16 @@ export default function DashboardClient({
             .map(v => v.model)
     )).filter(Boolean).sort();
 
+    const getVehicleCategory = (plate: string) => {
+        if (/-[Бб]$/.test(plate)) return 'Категория B (до 3.5т)';
+        if (/-[Цц]$/.test(plate)) return 'Категория C (над 3.5т)';
+        return 'Некатегоризирани';
+    };
+
     const filteredVehicles = availableVehicles.filter(v => {
         if (selectedBrand.length > 0 && !selectedBrand.includes(v.manufacturer)) return false;
         if (selectedModel.length > 0 && !selectedModel.includes(v.model)) return false;
+        if (selectedCategory && getVehicleCategory(v.licensePlate) !== selectedCategory) return false;
         return true;
     });
 
@@ -633,9 +641,18 @@ export default function DashboardClient({
                     </div>
                     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '20px', marginBottom: '24px' }}>
                         <div className={styles.card} style={{ minHeight: 280 }}>
-                            <h3 className={styles.sectionTitle} style={{ marginTop: 0, fontSize: '1em' }}>Среден скор по категория</h3>
+                            <h3 className={styles.sectionTitle} style={{ marginTop: 0, fontSize: '1em' }}>
+                                Среден скор по категория
+                                {selectedCategory && (
+                                    <button onClick={() => setSelectedCategory(null)} style={{ marginLeft: 8, fontSize: '0.75em', color: '#94a3b8', background: 'none', border: 'none', cursor: 'pointer' }}>✕ изчисти</button>
+                                )}
+                            </h3>
                             <div style={{ height: 240 }}>
-                                <CategoryChart vehicles={filteredVehicles} />
+                                <CategoryChart
+                                    vehicles={availableVehicles}
+                                    selectedCategory={selectedCategory}
+                                    onCategoryClick={(cat) => setSelectedCategory(selectedCategory === cat ? null : cat)}
+                                />
                             </div>
                         </div>
                         <div className={styles.card} style={{ minHeight: 280 }}>
