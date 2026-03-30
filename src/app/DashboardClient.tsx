@@ -545,13 +545,16 @@ export default function DashboardClient({
             {view === 'vehicles' ? (
                 <div style={{ padding: '20px 0' }}>
                     {(() => {
-                        const totalDist = filteredVehicles.reduce((acc, v) => acc + (v.distance || 0), 0);
+                        // Use drivers data for total km so it matches the Отчети tab
+                        const totalDist = totalDistance;
                         const avgScore = filteredVehicles.length > 0
-                            ? filteredVehicles.reduce((acc, v) => acc + v.score, 0) / filteredVehicles.length
+                            ? filteredVehicles.reduce((acc, v) => acc + v.score * (v.distance || 0), 0) /
+                              filteredVehicles.reduce((acc, v) => acc + (v.distance || 0), 0)
                             : 0;
                         const vWithCons = filteredVehicles.filter(v => (v.fuelConsumption || 0) > 0);
                         const avgCons = vWithCons.length > 0
-                            ? vWithCons.reduce((acc, v) => acc + (v.fuelConsumption || 0), 0) / vWithCons.length
+                            ? vWithCons.reduce((acc, v) => acc + (v.fuelConsumption || 0) * (v.distance || 0), 0) /
+                              vWithCons.reduce((acc, v) => acc + (v.distance || 0), 0)
                             : 0;
 
                         return (
