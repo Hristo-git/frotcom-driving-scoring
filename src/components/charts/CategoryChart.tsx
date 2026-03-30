@@ -40,7 +40,7 @@ const CustomTooltip = ({ active, payload, label }: any) => {
             }}>
                 <div style={{ fontWeight: 700, marginBottom: 6 }}>{label}</div>
                 <div>Автомобили: <b>{d.count}</b></div>
-                <div>Среден скор: <b style={{ color: d.score >= 7 ? '#4ade80' : d.score >= 4 ? '#fb923c' : '#f87171' }}>{d.score.toFixed(2)}</b></div>
+                <div>Средна оценка: <b style={{ color: d.score >= 7 ? '#4ade80' : d.score >= 4 ? '#fb923c' : '#f87171' }}>{d.score.toFixed(2)}</b></div>
                 <div>Километри: <b>{Math.round(d.km).toLocaleString('bg-BG')}</b></div>
                 <div>Среден разход: <b>{d.cons > 0 ? `${d.cons.toFixed(1)} L/100km` : '—'}</b></div>
             </div>

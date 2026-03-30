@@ -30,7 +30,7 @@ const CustomTooltip = ({ active, payload }: any) => {
             }}>
                 <div style={{ fontWeight: 700, marginBottom: 4, fontFamily: 'monospace', letterSpacing: 1 }}>{d.plate}</div>
                 <div style={{ color: '#94a3b8', marginBottom: 4 }}>{d.brand} {d.model}</div>
-                <div>Скор: <span style={{ color, fontWeight: 700 }}>{d.score.toFixed(2)}</span></div>
+                <div>Оценка: <span style={{ color, fontWeight: 700 }}>{d.score.toFixed(2)}</span></div>
                 <div>{Math.round(d.km).toLocaleString('bg-BG')} km</div>
             </div>
         );
@@ -65,10 +65,10 @@ export default function VehicleScatterChart({ vehicles }: Props) {
                     dataKey="score"
                     type="number"
                     domain={[0, 10]}
-                    name="Скор"
+                    name="Оценка"
                     tick={{ fill: '#94a3b8', fontSize: 11 }}
                     stroke="#475569"
-                    label={{ value: 'Скор', position: 'insideBottom', offset: -10, fill: '#64748b', fontSize: 11 }}
+                    label={{ value: 'Оценка', position: 'insideBottom', offset: -10, fill: '#64748b', fontSize: 11 }}
                 />
                 <YAxis
                     dataKey="km"

@@ -131,8 +131,8 @@ export default function LocationsMap({ data, selectedLocation = [], onLocationSe
                             <Popup>
                                 <div style={{ color: '#111', fontWeight: 600 }}>
                                     <div style={{ fontSize: '16px', marginBottom: '4px' }}>{loc.name}</div>
-                                    <div>Score: <span style={{ color }}>{loc.score.toFixed(2)}</span></div>
-                                    <div>Drivers: {loc.driverCount}</div>
+                                    <div>Оценка: <span style={{ color }}>{loc.score.toFixed(2)}</span></div>
+                                    <div>Шофьори: {loc.driverCount}</div>
                                 </div>
                             </Popup>
                         </CircleMarker>

@@ -26,7 +26,7 @@ const CustomTooltip = ({ active, payload, label }: any) => {
                 color: '#e2e8f0',
                 fontSize: '13px'
             }}>
-                <div style={{ fontWeight: 700, marginBottom: 4, color }}>Скор {label}–{(parseFloat(label) + 1).toFixed(0)}</div>
+                <div style={{ fontWeight: 700, marginBottom: 4, color }}>Оценка {label}–{(parseFloat(label) + 1).toFixed(0)}</div>
                 <div>{count} шофьор{count !== 1 ? 'и' : ''}</div>
             </div>
         );
@@ -64,7 +64,7 @@ export default function ScoreHistogram({ drivers }: Props) {
                     dataKey="range"
                     tick={{ fill: '#94a3b8', fontSize: 11 }}
                     stroke="#475569"
-                    label={{ value: 'Скор', position: 'insideBottom', offset: -4, fill: '#64748b', fontSize: 11 }}
+                    label={{ value: 'Оценка', position: 'insideBottom', offset: -4, fill: '#64748b', fontSize: 11 }}
                 />
                 <YAxis
                     allowDecimals={false}

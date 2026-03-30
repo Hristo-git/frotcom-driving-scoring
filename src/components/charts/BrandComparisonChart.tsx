@@ -26,7 +26,7 @@ const CustomTooltip = ({ active, payload, label }: any) => {
                 fontSize: '13px'
             }}>
                 <div style={{ fontWeight: 700, marginBottom: 4 }}>{label}</div>
-                <div>Среден скор: <span style={{ color, fontWeight: 700 }}>{score.toFixed(2)}</span></div>
+                <div>Средна оценка: <span style={{ color, fontWeight: 700 }}>{score.toFixed(2)}</span></div>
                 <div style={{ color: '#94a3b8' }}>Брой: {payload[0]?.payload?.count} авт.</div>
             </div>
         );

@@ -557,11 +557,12 @@ export default function DashboardClient({
             {view === 'vehicles' ? (
                 <div style={{ padding: '20px 0' }}>
                     {(() => {
-                        // Use drivers data for total km so it matches the Отчети tab
-                        const totalDist = totalDistance;
+                        // When category filter active use filtered vehicles km, otherwise full driver total
+                        const filteredKm = filteredVehicles.reduce((acc, v) => acc + (v.distance || 0), 0);
+                        const totalDist = selectedCategory ? filteredKm : totalDistance;
                         const avgScore = filteredVehicles.length > 0
                             ? filteredVehicles.reduce((acc, v) => acc + v.score * (v.distance || 0), 0) /
-                              filteredVehicles.reduce((acc, v) => acc + (v.distance || 0), 0)
+                              Math.max(filteredKm, 1)
                             : 0;
                         const vWithCons = filteredVehicles.filter(v => (v.fuelConsumption || 0) > 0);
                         const avgCons = vWithCons.length > 0
@@ -576,7 +577,7 @@ export default function DashboardClient({
                                     <div className={styles.cardValue}>{Math.round(totalDist).toLocaleString('bg-BG')}</div>
                                 </div>
                                 <div className={styles.card}>
-                                    <div className={styles.cardTitle}>Среден Скор</div>
+                                    <div className={styles.cardTitle}>Средна Оценка</div>
                                     <div className={`${styles.cardValue} ${getScoreClass(avgScore)}`}>
                                         {avgScore.toFixed(2)}
                                     </div>
@@ -636,7 +637,7 @@ export default function DashboardClient({
                             </div>
                         </div>
                         <div className={styles.card} style={{ minHeight: 280 }}>
-                            <h3 className={styles.sectionTitle} style={{ marginTop: 0, fontSize: '1em' }}>Среден скор по марка</h3>
+                            <h3 className={styles.sectionTitle} style={{ marginTop: 0, fontSize: '1em' }}>Средна оценка по марка</h3>
                             <div style={{ height: 240 }}>
                                 <BrandComparisonChart vehicles={filteredVehicles} />
                             </div>
@@ -645,7 +646,7 @@ export default function DashboardClient({
                     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '20px', marginBottom: '24px' }}>
                         <div className={styles.card} style={{ minHeight: 280 }}>
                             <h3 className={styles.sectionTitle} style={{ marginTop: 0, fontSize: '1em' }}>
-                                Среден скор по категория
+                                Средна оценка по категория
                                 {selectedCategory && (
                                     <button onClick={() => setSelectedCategory(null)} style={{ marginLeft: 8, fontSize: '0.75em', color: '#94a3b8', background: 'none', border: 'none', cursor: 'pointer' }}>✕ изчисти</button>
                                 )}
@@ -659,7 +660,7 @@ export default function DashboardClient({
                             </div>
                         </div>
                         <div className={styles.card} style={{ minHeight: 280 }}>
-                            <h3 className={styles.sectionTitle} style={{ marginTop: 0, fontSize: '1em' }}>Скор vs Километри (всеки камион)</h3>
+                            <h3 className={styles.sectionTitle} style={{ marginTop: 0, fontSize: '1em' }}>Оценка vs Километри (всеки камион)</h3>
                             <div style={{ height: 240 }}>
                                 <VehicleScatterChart vehicles={filteredVehicles} />
                             </div>
@@ -710,7 +711,7 @@ export default function DashboardClient({
                     {/* Driver Charts */}
                     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '20px', marginBottom: '24px' }}>
                         <div className={styles.card} style={{ minHeight: 280 }}>
-                            <h3 className={styles.sectionTitle} style={{ marginTop: 0, fontSize: '1em' }}>Разпределение на скоровете</h3>
+                            <h3 className={styles.sectionTitle} style={{ marginTop: 0, fontSize: '1em' }}>Разпределение на оценките</h3>
                             <div style={{ height: 240 }}>
                                 <ScoreHistogram drivers={sortedDrivers} />
                             </div>
@@ -858,17 +859,17 @@ export default function DashboardClient({
                 <>
                     <div className={styles.grid}>
                         <div className={styles.card}>
-                            <div className={styles.cardTitle}>Overall Score</div>
+                            <div className={styles.cardTitle}>Средна Оценка</div>
                             <div className={`${styles.cardValue} ${getScoreClass(parseFloat(overallScore))}`}>
                                 {overallScore}
                             </div>
                         </div>
                         <div className={styles.card}>
-                            <div className={styles.cardTitle}>Active Drivers</div>
+                            <div className={styles.cardTitle}>Активни Шофьори</div>
                             <div className={styles.cardValue}>{activeDrivers}</div>
                         </div>
                         <div className={styles.card}>
-                            <div className={styles.cardTitle}>Total Distance (km)</div>
+                            <div className={styles.cardTitle}>Общо Километри (km)</div>
                             <div className={styles.cardValue}>{Math.round(totalDistance).toLocaleString('bg-BG')}</div>
                         </div>
                         <div className={styles.card}>

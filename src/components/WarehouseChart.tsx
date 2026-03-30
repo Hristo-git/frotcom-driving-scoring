@@ -41,7 +41,7 @@ const CustomTooltip = ({ active, payload, label }: any) => {
             }}>
                 <p style={{ margin: '0 0 6px 0', fontSize: '14px', color: '#94a3b8' }}>{label}</p>
                 <p style={{ margin: 0, fontSize: '16px' }}>
-                    Score: <span style={{ color }}>{score.toFixed(2)}</span>
+                    Оценка: <span style={{ color }}>{score.toFixed(2)}</span>
                 </p>
             </div>
         );
