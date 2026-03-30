@@ -91,6 +91,17 @@ export default function DashboardClient({
     const [currentWeights] = useState<ScoringWeights>(weights);
     const [view, setView] = useState<'report' | 'vehicles' | 'drivers'>('report');
 
+    const monthShortcuts = (() => {
+        const now = new Date();
+        return Array.from({ length: 4 }, (_, i) => {
+            const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+            const s = new Date(Date.UTC(d.getFullYear(), d.getMonth(), 1)).toISOString().split('T')[0];
+            const e = new Date(Date.UTC(d.getFullYear(), d.getMonth() + 1, 0)).toISOString().split('T')[0];
+            const label = d.toLocaleDateString('bg-BG', { month: 'short', year: 'numeric' });
+            return { label, start: s, end: e };
+        });
+    })();
+
     const [expandedDriver, setExpandedDriver] = useState<number | null>(null);
     const [driverSortField, setDriverSortField] = useState<string>('score');
     const [driverSortOrder, setDriverSortOrder] = useState<'asc' | 'desc'>('desc');
@@ -453,27 +464,37 @@ export default function DashboardClient({
                     ))}
                 </div>
 
-                {/* Date range + refresh */}
+                {/* Date range */}
                 <div className={styles.dateSection}>
-                    <div className={styles.modeToggle}>
-                        <label><input type="radio" checked={mode === 'single'} onChange={() => { setMode('single'); setEnd(start); }} /> Ден</label>
-                        <label><input type="radio" checked={mode === 'range'} onChange={() => setMode('range')} /> Период</label>
+                    <div className={styles.monthShortcuts}>
+                        {monthShortcuts.map(m => (
+                            <button
+                                key={m.start}
+                                className={`${styles.chip} ${start === m.start && end === m.end ? styles.chipActive : ''}`}
+                                onClick={() => { setStart(m.start); setEnd(m.end); setMode('range'); applyWithDates(m.start, m.end); }}
+                            >{m.label}</button>
+                        ))}
                     </div>
-                    <input type="date" className={styles.filterInput} value={start}
-                        onChange={(e) => {
-                            const v = e.target.value;
-                            setStart(v);
-                            if (mode === 'single') { setEnd(v); applyWithDates(v, v); }
-                            else applyWithDates(v, end);
-                        }} />
-                    {mode === 'range' && (
-                        <>
-                            <span className={styles.dateSep}>—</span>
-                            <input type="date" className={styles.filterInput} value={end}
-                                onChange={(e) => { setEnd(e.target.value); applyWithDates(start, e.target.value); }} />
-                        </>
-                    )}
-                    <button className={styles.button} onClick={handleApplyFilter}>Обнови</button>
+                    <div className={styles.dateSectionCustom}>
+                        <div className={styles.modeToggle}>
+                            <label><input type="radio" checked={mode === 'single'} onChange={() => { setMode('single'); setEnd(start); }} /> Ден</label>
+                            <label><input type="radio" checked={mode === 'range'} onChange={() => setMode('range')} /> Период</label>
+                        </div>
+                        <input type="date" className={styles.filterInput} value={start}
+                            onChange={(e) => {
+                                const v = e.target.value;
+                                setStart(v);
+                                if (mode === 'single') { setEnd(v); applyWithDates(v, v); }
+                                else applyWithDates(v, end);
+                            }} />
+                        {mode === 'range' && (
+                            <>
+                                <span className={styles.dateSep}>—</span>
+                                <input type="date" className={styles.filterInput} value={end}
+                                    onChange={(e) => { setEnd(e.target.value); applyWithDates(start, e.target.value); }} />
+                            </>
+                        )}
+                    </div>
                 </div>
             </div>
 

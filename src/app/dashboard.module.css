@@ -149,12 +149,25 @@
   background: rgba(59, 130, 246, 0.3);
 }
 
-/* Date + refresh */
+/* Date section */
 .dateSection {
   display: flex;
-  align-items: center;
-  gap: 10px;
+  flex-direction: column;
+  gap: 8px;
   flex-shrink: 0;
+}
+
+.monthShortcuts {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.dateSectionCustom {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
 }
 
 .dateSep {
@@ -566,8 +579,12 @@
     padding: 7px 14px;
   }
 
-  .dateSection {
-    flex-wrap: wrap;
+  .monthShortcuts {
+    width: 100%;
+  }
+
+  .dateSectionCustom {
+    width: 100%;
     gap: 8px;
   }
 
@@ -576,12 +593,6 @@
     min-width: 100px;
     height: 42px;
     font-size: 16px; /* prevents iOS zoom */
-  }
-
-  .button {
-    flex: 1;
-    text-align: center;
-    height: 42px;
   }
 
   .modeToggle {
