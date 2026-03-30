@@ -91,6 +91,8 @@ export default function DashboardClient({
     const [currentWeights] = useState<ScoringWeights>(weights);
     const [view, setView] = useState<'report' | 'vehicles' | 'drivers'>('report');
 
+    const [showCustomDate, setShowCustomDate] = useState(false);
+
     const monthShortcuts = (() => {
         const now = new Date();
         return Array.from({ length: 4 }, (_, i) => {
@@ -101,6 +103,8 @@ export default function DashboardClient({
             return { label, start: s, end: e };
         });
     })();
+
+    const isCustomRange = !monthShortcuts.some(m => m.start === start && m.end === end);
 
     const [expandedDriver, setExpandedDriver] = useState<number | null>(null);
     const [driverSortField, setDriverSortField] = useState<string>('score');
@@ -471,30 +475,36 @@ export default function DashboardClient({
                             <button
                                 key={m.start}
                                 className={`${styles.chip} ${start === m.start && end === m.end ? styles.chipActive : ''}`}
-                                onClick={() => { setStart(m.start); setEnd(m.end); setMode('range'); applyWithDates(m.start, m.end); }}
+                                onClick={() => { setStart(m.start); setEnd(m.end); setMode('range'); setShowCustomDate(false); applyWithDates(m.start, m.end); }}
                             >{m.label}</button>
                         ))}
+                        <button
+                            className={`${styles.chip} ${isCustomRange || showCustomDate ? styles.chipActive : ''}`}
+                            onClick={() => setShowCustomDate(v => !v)}
+                        >...</button>
                     </div>
-                    <div className={styles.dateSectionCustom}>
-                        <div className={styles.modeToggle}>
-                            <label><input type="radio" checked={mode === 'single'} onChange={() => { setMode('single'); setEnd(start); }} /> Ден</label>
-                            <label><input type="radio" checked={mode === 'range'} onChange={() => setMode('range')} /> Период</label>
+                    {(showCustomDate || isCustomRange) && (
+                        <div className={styles.dateSectionCustom}>
+                            <div className={styles.modeToggle}>
+                                <label><input type="radio" checked={mode === 'single'} onChange={() => { setMode('single'); setEnd(start); }} /> Ден</label>
+                                <label><input type="radio" checked={mode === 'range'} onChange={() => setMode('range')} /> Период</label>
+                            </div>
+                            <input type="date" className={styles.filterInput} value={start}
+                                onChange={(e) => {
+                                    const v = e.target.value;
+                                    setStart(v);
+                                    if (mode === 'single') { setEnd(v); applyWithDates(v, v); }
+                                    else applyWithDates(v, end);
+                                }} />
+                            {mode === 'range' && (
+                                <>
+                                    <span className={styles.dateSep}>—</span>
+                                    <input type="date" className={styles.filterInput} value={end}
+                                        onChange={(e) => { setEnd(e.target.value); applyWithDates(start, e.target.value); }} />
+                                </>
+                            )}
                         </div>
-                        <input type="date" className={styles.filterInput} value={start}
-                            onChange={(e) => {
-                                const v = e.target.value;
-                                setStart(v);
-                                if (mode === 'single') { setEnd(v); applyWithDates(v, v); }
-                                else applyWithDates(v, end);
-                            }} />
-                        {mode === 'range' && (
-                            <>
-                                <span className={styles.dateSep}>—</span>
-                                <input type="date" className={styles.filterInput} value={end}
-                                    onChange={(e) => { setEnd(e.target.value); applyWithDates(start, e.target.value); }} />
-                            </>
-                        )}
-                    </div>
+                    )}
                 </div>
             </div>
 

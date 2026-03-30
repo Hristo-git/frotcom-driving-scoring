@@ -581,6 +581,10 @@
 
   .monthShortcuts {
     width: 100%;
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    padding-bottom: 4px;
+    mask-image: linear-gradient(to right, black 88%, transparent 100%);
   }
 
   .dateSectionCustom {
