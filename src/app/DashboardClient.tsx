@@ -10,6 +10,7 @@ import WarehouseChart from '../components/WarehouseChart';
 import BrandDonutChart from '../components/charts/BrandDonutChart';
 import BrandComparisonChart from '../components/charts/BrandComparisonChart';
 import VehicleScatterChart from '../components/charts/VehicleScatterChart';
+import CategoryChart from '../components/charts/CategoryChart';
 import ScoreHistogram from '../components/charts/ScoreHistogram';
 import TopBehaviorsChart from '../components/charts/TopBehaviorsChart';
 import CitySegmentChart from '../components/charts/CitySegmentChart';
@@ -630,10 +631,18 @@ export default function DashboardClient({
                             </div>
                         </div>
                     </div>
-                    <div className={styles.card} style={{ minHeight: 320, marginBottom: '24px' }}>
-                        <h3 className={styles.sectionTitle} style={{ marginTop: 0, fontSize: '1em' }}>Скор vs Километри (всеки камион)</h3>
-                        <div style={{ height: 280 }}>
-                            <VehicleScatterChart vehicles={filteredVehicles} />
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '20px', marginBottom: '24px' }}>
+                        <div className={styles.card} style={{ minHeight: 280 }}>
+                            <h3 className={styles.sectionTitle} style={{ marginTop: 0, fontSize: '1em' }}>Среден скор по категория</h3>
+                            <div style={{ height: 240 }}>
+                                <CategoryChart vehicles={filteredVehicles} />
+                            </div>
+                        </div>
+                        <div className={styles.card} style={{ minHeight: 280 }}>
+                            <h3 className={styles.sectionTitle} style={{ marginTop: 0, fontSize: '1em' }}>Скор vs Километри (всеки камион)</h3>
+                            <div style={{ height: 240 }}>
+                                <VehicleScatterChart vehicles={filteredVehicles} />
+                            </div>
                         </div>
                     </div>
 
