@@ -68,7 +68,7 @@ export default function BrandComparisonChart({ vehicles }: Props) {
                     <YAxis dataKey="name" type="category" tick={{ fill: '#e2e8f0', fontSize: 12 }} width={90} stroke="none" />
                     <Tooltip content={<CustomTooltip />} cursor={{ fill: 'rgba(255,255,255,0.04)' }} />
                     <Bar dataKey="score" radius={[0, 4, 4, 0]}>
-                        <LabelList dataKey="score" position="right" formatter={(v: number) => v.toFixed(2)} style={{ fill: '#94a3b8', fontSize: 11 }} />
+                        <LabelList dataKey="score" position="right" formatter={(v: unknown) => typeof v === 'number' ? v.toFixed(2) : ''} style={{ fill: '#94a3b8', fontSize: 11 }} />
                         {data.map((entry, i) => {
                             let fill = '#ef4444';
                             if (entry.score >= 7) fill = '#10b981';

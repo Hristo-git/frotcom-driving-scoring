@@ -92,7 +92,7 @@ export default function TopBehaviorsChart({ drivers }: Props) {
                     <YAxis dataKey="name" type="category" tick={{ fill: '#e2e8f0', fontSize: 11 }} width={140} stroke="none" />
                     <Tooltip content={<CustomTooltip />} cursor={{ fill: 'rgba(255,255,255,0.04)' }} />
                     <Bar dataKey="per100" radius={[0, 4, 4, 0]}>
-                        <LabelList dataKey="per100" position="right" formatter={(v: number) => v.toFixed(2)} style={{ fill: '#94a3b8', fontSize: 11 }} />
+                        <LabelList dataKey="per100" position="right" formatter={(v: unknown) => typeof v === 'number' ? v.toFixed(2) : ''} style={{ fill: '#94a3b8', fontSize: 11 }} />
                         {data.map((entry, i) => {
                             let fill = '#ef4444';
                             if (entry.per100 <= 0.5) fill = '#10b981';
