@@ -528,6 +528,7 @@ export class ScoringEngine {
                   AND es.period_end::date = $2::date
                   AND (es.metrics->>'isPeriodSummary')::boolean = true
                   AND CAST(es.metrics->>'mileage' AS NUMERIC) > 0
+                  AND jsonb_typeof(es.metrics->'vehicles') = 'array'
             ) sub
             LEFT JOIN vehicles v ON v.license_plate = sub.plate
         `;
