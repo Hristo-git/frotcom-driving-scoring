@@ -526,7 +526,13 @@ export class ScoringEngine {
                   AND jsonb_typeof(es.metrics->'vehicles') = 'array'
                   AND jsonb_array_length(es.metrics->'vehicles') > 0
             ) sub
+            -- Match plate directly OR by stripping the trailing suffix (-Б, -Ц, etc.)
+            -- The vehicles table stores plates with suffix; ecodriving data may omit it
             LEFT JOIN vehicles v ON v.license_plate = sub.plate
+                OR v.license_plate = sub.plate || '-Б'
+                OR v.license_plate = sub.plate || '-Ц'
+                OR v.license_plate = sub.plate || '-б'
+                OR v.license_plate = sub.plate || '-ц'
         `;
         const params: any[] = [start.substring(0, 10), end.substring(0, 10)];
         let paramIdx = 3;
