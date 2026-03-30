@@ -7,6 +7,12 @@ import { PerformanceReport, AggregatedPerformance, ScoringWeights, VehiclePerfor
 // Import dynamic with no SSR for Leaflet map to avoid window is not defined errors
 import dynamic from 'next/dynamic';
 import WarehouseChart from '../components/WarehouseChart';
+import BrandDonutChart from '../components/charts/BrandDonutChart';
+import BrandComparisonChart from '../components/charts/BrandComparisonChart';
+import VehicleScatterChart from '../components/charts/VehicleScatterChart';
+import ScoreHistogram from '../components/charts/ScoreHistogram';
+import TopBehaviorsChart from '../components/charts/TopBehaviorsChart';
+import CitySegmentChart from '../components/charts/CitySegmentChart';
 import {
     IconAccelLow,
     IconAccelHigh,
@@ -575,6 +581,28 @@ export default function DashboardClient({
                         </div>
                     </div>
 
+                    {/* Vehicle Charts */}
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '20px', marginBottom: '24px' }}>
+                        <div className={styles.card} style={{ minHeight: 280 }}>
+                            <h3 className={styles.sectionTitle} style={{ marginTop: 0, fontSize: '1em' }}>Километри по марка</h3>
+                            <div style={{ height: 240 }}>
+                                <BrandDonutChart vehicles={filteredVehicles} />
+                            </div>
+                        </div>
+                        <div className={styles.card} style={{ minHeight: 280 }}>
+                            <h3 className={styles.sectionTitle} style={{ marginTop: 0, fontSize: '1em' }}>Среден скор по марка</h3>
+                            <div style={{ height: 240 }}>
+                                <BrandComparisonChart vehicles={filteredVehicles} />
+                            </div>
+                        </div>
+                    </div>
+                    <div className={styles.card} style={{ minHeight: 320, marginBottom: '24px' }}>
+                        <h3 className={styles.sectionTitle} style={{ marginTop: 0, fontSize: '1em' }}>Скор vs Километри (всеки камион)</h3>
+                        <div style={{ height: 280 }}>
+                            <VehicleScatterChart vehicles={filteredVehicles} />
+                        </div>
+                    </div>
+
                     <div className={styles.tableContainer} style={{ maxHeight: '70vh', overflowY: 'auto' }}>
                         <table className={styles.table}>
                             <thead style={{ position: 'sticky', top: 0, background: 'var(--card-bg)', zIndex: 1 }}>
@@ -616,6 +644,22 @@ export default function DashboardClient({
                 </div>
             ) : view === 'drivers' ? (
                 <div style={{ padding: '20px 0' }}>
+                    {/* Driver Charts */}
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '20px', marginBottom: '24px' }}>
+                        <div className={styles.card} style={{ minHeight: 280 }}>
+                            <h3 className={styles.sectionTitle} style={{ marginTop: 0, fontSize: '1em' }}>Разпределение на скоровете</h3>
+                            <div style={{ height: 240 }}>
+                                <ScoreHistogram drivers={sortedDrivers} />
+                            </div>
+                        </div>
+                        <div className={styles.card} style={{ minHeight: 280 }}>
+                            <h3 className={styles.sectionTitle} style={{ marginTop: 0, fontSize: '1em' }}>Топ проблемни поведения (fleet)</h3>
+                            <div style={{ height: 240 }}>
+                                <TopBehaviorsChart drivers={sortedDrivers} />
+                            </div>
+                        </div>
+                    </div>
+
                     <div className={styles.tableContainer} style={{ maxHeight: '70vh', overflowY: 'auto' }}>
                         <table className={styles.table}>
                             <thead style={{ position: 'sticky', top: 0, background: 'var(--card-bg)', zIndex: 1 }}>
@@ -796,6 +840,19 @@ export default function DashboardClient({
                                     </div>
                                 </div>
                             )}
+                        </div>
+                    )}
+
+                    {/* City segment chart */}
+                    {countries.length > 0 && (
+                        <div className={styles.card} style={{ minHeight: 320, marginTop: '24px' }}>
+                            <h2 className={styles.sectionTitle} style={{ marginTop: 0 }}>Шофьори по град и категория</h2>
+                            <div style={{ height: 280 }}>
+                                <CitySegmentChart
+                                    drivers={drivers}
+                                    onCityClick={(city) => toggleFilter('country', city)}
+                                />
+                            </div>
                         </div>
                     )}
 
