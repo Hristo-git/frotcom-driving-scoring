@@ -70,7 +70,7 @@ export default function CitySegmentChart({ drivers, onCityClick }: Props) {
                 data={data}
                 margin={{ top: 8, right: 16, left: 0, bottom: 60 }}
                 onClick={(e) => {
-                    if (e && e.activeLabel && onCityClick) onCityClick(e.activeLabel);
+                    if (e && e.activeLabel && onCityClick) onCityClick(String(e.activeLabel));
                 }}
                 style={{ cursor: onCityClick ? 'pointer' : 'default' }}
             >
