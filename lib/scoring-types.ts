@@ -42,6 +42,7 @@ export interface VehiclePerformance {
     licensePlate: string;
     manufacturer: string;
     model: string;
+    vehicleClass: string; // e.g. VC_Truck, VC_Minibus, VC_Van
     score: number;
     distance: number;
     fuelConsumption: number;

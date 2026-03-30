@@ -500,6 +500,7 @@ export class ScoringEngine {
                 sub.plate,
                 v.metadata->>'manufacturer' AS manufacturer,
                 v.metadata->>'model' AS model,
+                v.metadata->>'className' AS vehicle_class,
                 SUM(sub.driver_mileage) AS total_distance,
                 SUM(sub.weighted_score) AS weighted_score,
                 SUM(sub.weighted_consumption) AS weighted_consumption
@@ -542,7 +543,7 @@ export class ScoringEngine {
             query += ` sub.warehouse_name = ANY($${paramIdx}::text[])`;
             params.push(options.warehouseNames); paramIdx++;
         }
-        query += ` GROUP BY sub.plate, manufacturer, model ORDER BY total_distance DESC`;
+        query += ` GROUP BY sub.plate, manufacturer, model, vehicle_class ORDER BY total_distance DESC`;
 
         try {
             const res = await pool.query(query, params);
@@ -550,6 +551,7 @@ export class ScoringEngine {
                 licensePlate: row.plate,
                 manufacturer: row.manufacturer || 'Unknown',
                 model: row.model || 'Unknown',
+                vehicleClass: row.vehicle_class || '',
                 score: row.total_distance > 0 ? parseFloat((row.weighted_score / row.total_distance).toFixed(2)) : 0,
                 distance: parseFloat(parseFloat(row.total_distance || 0).toFixed(1)),
                 fuelConsumption: row.total_distance > 0 ? parseFloat((row.weighted_consumption / row.total_distance).toFixed(2)) : 0

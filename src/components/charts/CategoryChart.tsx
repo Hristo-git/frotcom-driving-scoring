@@ -12,9 +12,11 @@ interface Props {
     onCategoryClick?: (cat: string) => void;
 }
 
-function getCategory(plate: string): string {
+function getCategory(plate: string, vehicleClass?: string): string {
     if (/-[Бб]$/.test(plate)) return 'Категория B (до 3.5т)';
     if (/-[Цц]$/.test(plate)) return 'Категория C (над 3.5т)';
+    if (vehicleClass === '[VC_Truck]') return 'Категория C (над 3.5т)';
+    if (vehicleClass === '[VC_Minibus]' || vehicleClass === '[VC_Van]' || vehicleClass === '[VC_Passenger]') return 'Категория B (до 3.5т)';
     return 'Некатегоризирани';
 }
 
@@ -52,7 +54,7 @@ export default function CategoryChart({ vehicles, selectedCategory, onCategoryCl
         const map = new Map<string, { km: number; weightedScore: number; weightedCons: number; consKm: number; count: number }>();
 
         for (const v of vehicles) {
-            const cat = getCategory(v.licensePlate);
+            const cat = getCategory(v.licensePlate, v.vehicleClass);
             if (!map.has(cat)) map.set(cat, { km: 0, weightedScore: 0, weightedCons: 0, consKm: 0, count: 0 });
             const e = map.get(cat)!;
             e.km += v.distance || 0;

@@ -296,16 +296,19 @@ export default function DashboardClient({
             .map(v => v.model)
     )).filter(Boolean).sort();
 
-    const getVehicleCategory = (plate: string) => {
+    const getVehicleCategory = (plate: string, vehicleClass?: string) => {
         if (/-[Бб]$/.test(plate)) return 'Категория B (до 3.5т)';
         if (/-[Цц]$/.test(plate)) return 'Категория C (над 3.5т)';
+        // Fall back to className from metadata
+        if (vehicleClass === '[VC_Truck]') return 'Категория C (над 3.5т)';
+        if (vehicleClass === '[VC_Minibus]' || vehicleClass === '[VC_Van]' || vehicleClass === '[VC_Passenger]') return 'Категория B (до 3.5т)';
         return 'Некатегоризирани';
     };
 
     const filteredVehicles = availableVehicles.filter(v => {
         if (selectedBrand.length > 0 && !selectedBrand.includes(v.manufacturer)) return false;
         if (selectedModel.length > 0 && !selectedModel.includes(v.model)) return false;
-        if (selectedCategory && getVehicleCategory(v.licensePlate) !== selectedCategory) return false;
+        if (selectedCategory && getVehicleCategory(v.licensePlate, v.vehicleClass) !== selectedCategory) return false;
         return true;
     });
 
