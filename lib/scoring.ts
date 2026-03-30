@@ -492,12 +492,9 @@ export class ScoringEngine {
     }
 
     async getVehiclePerformance(start: string, end: string, options?: { countryNames?: string[], warehouseNames?: string[], weights?: ScoringWeights }): Promise<VehiclePerformance[]> {
-        // Use period-summary rows (same source as driver tab) so km totals match.
-        // Each vehicle appears in the `vehicles` JSON array of the driver's period-summary row.
-        // We sum the driver's mileage attributed to each vehicle proportionally — but since
-        // the API only gives total mileage per driver (not per vehicle), we use the driver's
-        // full mileage for score/consumption weighting and show it per-vehicle as a best estimate.
-        // Expand the vehicles JSON array in a subquery first, then join vehicles table
+        // Use daily rows (isPeriodSummary IS NULL) which contain vehicle plate arrays
+        // populated during the daily cron sync. Period-summary rows do not include plates
+        // because the Frotcom driver-level API does not return them.
         let query = `
             SELECT
                 sub.plate,
@@ -509,8 +506,6 @@ export class ScoringEngine {
             FROM (
                 SELECT
                     jsonb_array_elements_text(es.metrics->'vehicles') AS plate,
-                    -- Divide mileage equally across all vehicles the driver used
-                    -- to avoid counting the same km multiple times
                     CAST(es.metrics->>'mileage' AS NUMERIC)
                         / GREATEST(jsonb_array_length(es.metrics->'vehicles'), 1) AS driver_mileage,
                     es.overall_score * CAST(es.metrics->>'mileage' AS NUMERIC)
@@ -524,11 +519,12 @@ export class ScoringEngine {
                 JOIN drivers d ON es.driver_id = d.id
                 LEFT JOIN countries c ON d.country_id = c.id
                 LEFT JOIN warehouses w ON d.warehouse_id = w.id
-                WHERE es.period_start::date = $1::date
-                  AND es.period_end::date = $2::date
-                  AND (es.metrics->>'isPeriodSummary')::boolean = true
+                WHERE DATE((es.period_start AT TIME ZONE 'UTC') AT TIME ZONE 'Europe/Sofia') >= $1::date
+                  AND DATE((es.period_start AT TIME ZONE 'UTC') AT TIME ZONE 'Europe/Sofia') <= $2::date
+                  AND (es.metrics->>'isPeriodSummary') IS NULL
                   AND CAST(es.metrics->>'mileage' AS NUMERIC) > 0
                   AND jsonb_typeof(es.metrics->'vehicles') = 'array'
+                  AND jsonb_array_length(es.metrics->'vehicles') > 0
             ) sub
             LEFT JOIN vehicles v ON v.license_plate = sub.plate
         `;
