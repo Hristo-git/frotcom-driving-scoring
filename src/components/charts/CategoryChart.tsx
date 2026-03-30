@@ -95,7 +95,7 @@ export default function CategoryChart({ vehicles }: Props) {
                     {data.map((entry) => (
                         <Cell key={entry.name} fill={entry.fill} />
                     ))}
-                    <LabelList dataKey="score" position="top" formatter={(v: number) => v.toFixed(2)} style={{ fill: '#cbd5e1', fontSize: 12, fontWeight: 700 }} />
+                    <LabelList dataKey="score" position="top" formatter={(v: any) => typeof v === 'number' ? v.toFixed(2) : v} style={{ fill: '#cbd5e1', fontSize: 12, fontWeight: 700 }} />
                 </Bar>
             </BarChart>
         </ResponsiveContainer>
