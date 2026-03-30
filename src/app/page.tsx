@@ -1,10 +1,10 @@
 
 import { ScoringEngine, DEFAULT_WEIGHTS, ScoringWeights } from '../../lib/scoring';
 import DashboardClient from './DashboardClient';
-// import { unstable_noStore as noStore } from 'next/cache'; // Optional based on caching needs
+import { unstable_cache } from 'next/cache';
 
 export const dynamic = 'force-dynamic';
-export const maxDuration = 60; // seconds — needed for Frotcom API call (~15s for 176 drivers)
+export const maxDuration = 60;
 
 export default async function DashboardPage(props: {
     searchParams?: Promise<{ [key: string]: string | string[] | undefined }>;
@@ -67,13 +67,23 @@ export default async function DashboardPage(props: {
         accelDuringCruise: getW('adc', DEFAULT_WEIGHTS.accelDuringCruise),
     };
 
-    // Fetch data in parallel
-    const [drivers, countries, warehouses, vehicles] = await Promise.all([
-        engine.getDriverPerformance(start, end, { weights, countryNames: selectedCountry, warehouseNames: selectedWarehouse }),
-        engine.getCountryPerformance(start, end, { warehouseNames: selectedWarehouse, weights }),
-        engine.getWarehousePerformance(start, end, weights, { countryNames: selectedCountry }),
-        engine.getVehiclePerformance(start, end, { weights, countryNames: selectedCountry, warehouseNames: selectedWarehouse })
-    ]);
+    // Cache per unique combination of start/end/filters — revalidate after 5 min
+    const fetchDashboardData = unstable_cache(
+        async (s: string, e: string, countries?: string[], warehouses?: string[]) => {
+            return Promise.all([
+                engine.getDriverPerformance(s, e, { weights, countryNames: countries, warehouseNames: warehouses }),
+                engine.getCountryPerformance(s, e, { warehouseNames: warehouses, weights }),
+                engine.getWarehousePerformance(s, e, weights, { countryNames: countries }),
+                engine.getVehiclePerformance(s, e, { weights, countryNames: countries, warehouseNames: warehouses }),
+            ]);
+        },
+        ['dashboard-data'],
+        { revalidate: 300, tags: ['dashboard'] }
+    );
+
+    const [drivers, countries, warehouses, vehicles] = await fetchDashboardData(
+        start, end, selectedCountry, selectedWarehouse
+    );
 
     // console.log(`Fetched: ${drivers.length} drivers, ${countries.length} countries, ${warehouses.length} warehouses, ${vehicles.length} vehicles`);
     console.log(`[Dashboard] Range: ${start} to ${end}`);
