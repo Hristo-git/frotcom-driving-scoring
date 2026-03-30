@@ -20,14 +20,17 @@ export default async function DashboardPage(props: {
         console.error('DATABASE_URL is not defined in environment variables!');
     }
 
-    // Default to current month
+    // Default to current month; if 1st or 2nd of month, default to previous month
     const now = new Date();
-    // Start of current month (UTC)
-    const firstDay = new Date(Date.UTC(now.getFullYear(), now.getMonth(), 1));
+    const targetMonth = now.getUTCDate() <= 2
+        ? now.getUTCMonth() - 1  // previous month (Date.UTC handles negative correctly)
+        : now.getUTCMonth();
+    const targetYear = now.getUTCFullYear();
+
+    const firstDay = new Date(Date.UTC(targetYear, targetMonth, 1));
     const startStr = firstDay.toISOString();
 
-    // End of current month (UTC)
-    const lastDay = new Date(Date.UTC(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59, 999));
+    const lastDay = new Date(Date.UTC(targetYear, targetMonth + 1, 0, 23, 59, 59, 999));
     const endStr = lastDay.toISOString();
 
     const start = (searchParams?.start as string) || startStr;
