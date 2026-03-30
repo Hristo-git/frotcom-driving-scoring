@@ -210,18 +210,40 @@ export default function DashboardClient({
         return recs;
     };
 
-    const totalDistance = drivers.reduce((acc, d) => acc + (d.distance || 0), 0);
-    const overallScore = totalDistance > 0
-        ? (drivers.reduce((acc, d) => acc + (d.score * (d.distance || 0)), 0) / totalDistance).toFixed(2)
-        : '0.00';
+    // ── UNIFIED FILTERING & SUMMARIES ──
+    const vehicleMap = React.useMemo(() => new Map(vehicles.map(v => [v.licensePlate, v])), [vehicles]);
 
-    const activeDrivers = drivers.length;
+    const filteredDrivers = React.useMemo(() => drivers.filter(d => {
+        if (selectedBrand.length === 0 && selectedModel.length === 0) return true;
+        return d.vehicles.some(plate => {
+            const v = vehicleMap.get(plate);
+            if (!v) return false;
+            const brandMatch = selectedBrand.length === 0 || selectedBrand.includes(v.manufacturer);
+            const modelMatch = selectedModel.length === 0 || selectedModel.includes(v.model);
+            return brandMatch && modelMatch;
+        });
+    }), [drivers, selectedBrand, selectedModel, vehicleMap]);
 
-    const activeDriversWithConsumption = drivers.filter(d => d.consumption > 0);
-    const totalDistanceForConsumption = activeDriversWithConsumption.reduce((acc, d) => acc + (d.distance || 0), 0);
-    const avgConsumption = totalDistanceForConsumption > 0
-        ? (activeDriversWithConsumption.reduce((acc, d) => acc + (d.consumption * (d.distance || 0)), 0) / totalDistanceForConsumption).toFixed(1)
+    const filteredVehicles = React.useMemo(() => vehicles.filter(v => {
+        if (selectedBrand.length > 0 && !selectedBrand.includes(v.manufacturer)) return false;
+        if (selectedModel.length > 0 && !selectedModel.includes(v.model)) return false;
+        if (selectedCategory && getVehicleCategory(v.licensePlate, v.vehicleClass) !== selectedCategory) return false;
+        return true;
+    }), [vehicles, selectedBrand, selectedModel, selectedCategory]);
+
+    const totalDistance = filteredDrivers.reduce((acc, d) => acc + (d.distance || 0), 0);
+    const activeDrivers = filteredDrivers.length;
+    const activeVehiclesCount = filteredVehicles.length;
+
+    const driversWithConsumption = filteredDrivers.filter(d => d.consumption > 0);
+    const distForCons = driversWithConsumption.reduce((acc, d) => acc + (d.distance || 0), 0);
+    const avgConsumption = distForCons > 0
+        ? (driversWithConsumption.reduce((acc, d) => acc + (d.consumption * (d.distance || 0)), 0) / distForCons).toFixed(1)
         : '0.0';
+
+    const overallScore = totalDistance > 0
+        ? (filteredDrivers.reduce((acc, d) => acc + (d.score * (d.distance || 0)), 0) / totalDistance).toFixed(2)
+        : '0.00';
 
     const getScoreClass = (score: number) => {
         if (score >= 7.0) return styles.scoreHigh;
@@ -254,7 +276,7 @@ export default function DashboardClient({
         }));
 
     // Split drivers by score categories
-    const sortedDriversRaw = [...drivers].sort((a, b) => {
+    const sortedDriversRaw = [...filteredDrivers].sort((a, b) => {
         const field = driverSortField as keyof typeof a;
         let valA = a[field];
         let valB = b[field];
@@ -271,11 +293,10 @@ export default function DashboardClient({
         return driverSortOrder === 'asc' ? numA - numB : numB - numA;
     });
 
-    const sortedDrivers = sortedDriversRaw; // For score categorization, we might still want the default score sort, but let's see. 
-    // Actually, excellentDrivers etc should probably stay sorted by score for the overview.
-    const excellentDrivers = [...drivers].sort((a, b) => b.score - a.score).filter(d => d.score >= 7.0); // Green
-    const goodDrivers = [...drivers].sort((a, b) => b.score - a.score).filter(d => d.score >= 4.0 && d.score < 7.0); // Orange
-    const attentionDrivers = [...drivers].sort((a, b) => b.score - a.score).filter(d => d.score < 4.0); // Red
+    const sortedDrivers = sortedDriversRaw; 
+    const excellentDrivers = [...filteredDrivers].sort((a, b) => b.score - a.score).filter(d => d.score >= 7.0); // Green
+    const goodDrivers = [...filteredDrivers].sort((a, b) => b.score - a.score).filter(d => d.score >= 4.0 && d.score < 7.0); // Orange
+    const attentionDrivers = [...filteredDrivers].sort((a, b) => b.score - a.score).filter(d => d.score < 4.0); // Red
 
     const excellentPct = activeDrivers > 0 ? Math.round((excellentDrivers.length / activeDrivers) * 100) : 0;
     const goodPct = activeDrivers > 0 ? Math.round((goodDrivers.length / activeDrivers) * 100) : 0;
@@ -305,12 +326,6 @@ export default function DashboardClient({
         return 'Некатегоризирани';
     };
 
-    const filteredVehicles = availableVehicles.filter(v => {
-        if (selectedBrand.length > 0 && !selectedBrand.includes(v.manufacturer)) return false;
-        if (selectedModel.length > 0 && !selectedModel.includes(v.model)) return false;
-        if (selectedCategory && getVehicleCategory(v.licensePlate, v.vehicleClass) !== selectedCategory) return false;
-        return true;
-    });
 
     const getIndicatorColor = (type: string, val: number, distance: number = 0) => {
         const colors = {
@@ -557,9 +572,7 @@ export default function DashboardClient({
             {view === 'vehicles' ? (
                 <div style={{ padding: '20px 0' }}>
                     {(() => {
-                        // When category filter active use filtered vehicles km, otherwise full driver total
                         const filteredKm = filteredVehicles.reduce((acc, v) => acc + (v.distance || 0), 0);
-                        const totalDist = selectedCategory ? filteredKm : totalDistance;
                         const avgScore = filteredVehicles.length > 0
                             ? filteredVehicles.reduce((acc, v) => acc + v.score * (v.distance || 0), 0) /
                               Math.max(filteredKm, 1)
@@ -573,8 +586,12 @@ export default function DashboardClient({
                         return (
                             <div className={styles.grid}>
                                 <div className={styles.card}>
+                                    <div className={styles.cardTitle}>Активни Автомобили</div>
+                                    <div className={styles.cardValue}>{filteredVehicles.length}</div>
+                                </div>
+                                <div className={styles.card}>
                                     <div className={styles.cardTitle}>Общо Километри (km)</div>
-                                    <div className={styles.cardValue}>{Math.round(totalDist).toLocaleString('bg-BG')}</div>
+                                    <div className={styles.cardValue}>{Math.round(filteredKm).toLocaleString('bg-BG')}</div>
                                 </div>
                                 <div className={styles.card}>
                                     <div className={styles.cardTitle}>Средна Оценка</div>

@@ -250,8 +250,8 @@ export class ScoringEngine {
             }
             d.totalDistance    += mileage;
             d.totalDrivingTime += (record.drivingTime || 0);
-            if (record.licensePlate) d.vehicles.add(record.licensePlate);
-            if (Array.isArray(record.vehicles)) record.vehicles.forEach((p: string) => d.vehicles.add(p));
+            if (record.license_plate) d.vehicles.add(record.license_plate.replace(/-[БЦбц]$/, ""));
+            if (Array.isArray(record.vehicles)) record.vehicles.forEach((p: string) => d.vehicles.add(p.replace(/-[БЦбц]$/, "")));
             (record.recommendations || []).forEach((id: number) => {
                 const label = RECOMMENDATION_LABELS[id];
                 if (label) d.recommendations.add(label);
@@ -351,7 +351,7 @@ export class ScoringEngine {
             idling:          parseFloat((parseFloat(row.metrics.idleTimePerc) || 0).toFixed(2)),
             consumption:     parseFloat((parseFloat(row.metrics.averageConsumption) || 0).toFixed(2)),
             rpm:             parseFloat((parseFloat(row.metrics.highRPMPerc) || 0).toFixed(2)),
-            vehicles:        Array.isArray(row.metrics.vehicles) ? row.metrics.vehicles : [],
+            vehicles:        Array.isArray(row.metrics.vehicles) ? (row.metrics.vehicles as string[]).map(p => p.replace(/-[БЦбц]$/, "")) : [],
             recommendations: Array.isArray(row.metrics.failingCriteria) ? row.metrics.failingCriteria : [],
             dataPoints:      1,
             events:          evByDriver.get(row.driver_id) || {},
@@ -371,6 +371,8 @@ export class ScoringEngine {
             WHERE DATE((es.period_start AT TIME ZONE 'UTC') AT TIME ZONE 'Europe/Sofia') >= $1::date
               AND DATE((es.period_start AT TIME ZONE 'UTC') AT TIME ZONE 'Europe/Sofia') <= $2::date
               AND (es.metrics->>'isPeriodSummary') IS NULL
+              AND jsonb_typeof(es.metrics->'vehicles') = 'array'
+              AND jsonb_array_length(es.metrics->'vehicles') > 0
         `;
         const params: any[] = [start, end];
         let paramIdx = 3;
@@ -411,7 +413,7 @@ export class ScoringEngine {
             }
             d.totalDistance    += distance;
             d.totalDrivingTime += parseFloat(row.metrics.drivingTime) || 0;
-            rowVehicles.forEach((p: string) => d.vehicles.add(p));
+            rowVehicles.forEach((p: string) => d.vehicles.add(p.replace(/-[БЦбц]$/, "")));
             if (Array.isArray(row.metrics.failingCriteria))
                 row.metrics.failingCriteria.forEach((c: string) => d.recommendations.add(c));
         });
@@ -506,7 +508,7 @@ export class ScoringEngine {
                 SUM(sub.weighted_consumption) AS weighted_consumption
             FROM (
                 SELECT
-                    jsonb_array_elements_text(es.metrics->'vehicles') AS plate,
+                    REGEXP_REPLACE(jsonb_array_elements_text(es.metrics->'vehicles'), '-[БЦбц]$', '') AS plate,
                     CAST(es.metrics->>'mileage' AS NUMERIC)
                         / GREATEST(jsonb_array_length(es.metrics->'vehicles'), 1) AS driver_mileage,
                     es.overall_score * CAST(es.metrics->>'mileage' AS NUMERIC)
