@@ -97,7 +97,7 @@ export default function CategoryChart({ vehicles, selectedCategory, onCategoryCl
                     dataKey="score"
                     radius={[6, 6, 0, 0]}
                     cursor="pointer"
-                    onClick={(d) => onCategoryClick?.(d.name)}
+                    onClick={(d) => d?.name && onCategoryClick?.(d.name)}
                 >
                     {data.map((entry) => (
                         <Cell
