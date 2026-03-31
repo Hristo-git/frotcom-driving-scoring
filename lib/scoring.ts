@@ -301,7 +301,7 @@ export class ScoringEngine {
         const endDate   = end.substring(0, 10);
 
         let query = `
-            SELECT
+            SELECT DISTINCT ON (d.id)
                 d.id as driver_id, d.name, c.name as country, w.name as warehouse,
                 c.id as country_id, w.id as warehouse_id,
                 es.overall_score, es.metrics
@@ -309,8 +309,8 @@ export class ScoringEngine {
             JOIN drivers d ON es.driver_id = d.id
             LEFT JOIN countries c ON d.country_id = c.id
             LEFT JOIN warehouses w ON d.warehouse_id = w.id
-            WHERE es.period_start::date = $1::date
-              AND es.period_end::date = $2::date
+            WHERE DATE((es.period_start AT TIME ZONE 'UTC') AT TIME ZONE 'Europe/Sofia') = $1::date
+              AND DATE((es.period_end   AT TIME ZONE 'UTC') AT TIME ZONE 'Europe/Sofia') <= $2::date
               AND (es.metrics->>'isPeriodSummary')::boolean = true
         `;
         const params: any[] = [startDate, endDate];
@@ -318,6 +318,7 @@ export class ScoringEngine {
         if (options?.countryNames?.length)   { query += ` AND c.name = ANY($${paramIdx}::text[])`; params.push(options.countryNames);   paramIdx++; }
         if (options?.warehouseNames?.length)  { query += ` AND w.name = ANY($${paramIdx}::text[])`; params.push(options.warehouseNames);  paramIdx++; }
         if (options?.driverIds?.length)       { query += ` AND d.id = ANY($${paramIdx}::int[])`;    params.push(options.driverIds);        paramIdx++; }
+        query += ` ORDER BY d.id, es.period_end DESC`;
 
         const res = await pool.query(query, params);
 
