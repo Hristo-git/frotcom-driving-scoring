@@ -4,6 +4,7 @@ import { useMemo } from 'react';
 import {
     BarChart, Bar, Cell, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, LabelList
 } from 'recharts';
+import { formatScore, formatKm, formatConsumption } from '../../../lib/formatters';
 import { VehiclePerformance } from '../../../lib/scoring-types';
 
 interface Props {
@@ -40,9 +41,9 @@ const CustomTooltip = ({ active, payload, label }: any) => {
             }}>
                 <div style={{ fontWeight: 700, marginBottom: 6 }}>{label}</div>
                 <div>Автомобили: <b>{d.count}</b></div>
-                <div>Средна оценка: <b style={{ color: d.score >= 7 ? '#4ade80' : d.score >= 4 ? '#fb923c' : '#f87171' }}>{d.score.toFixed(2)}</b></div>
-                <div>Километри: <b>{Math.round(d.km).toLocaleString('bg-BG')}</b></div>
-                <div>Среден разход: <b>{d.cons > 0 ? `${d.cons.toFixed(1)} L/100km` : '—'}</b></div>
+                <div>Средна оценка: <b style={{ color: d.score >= 7 ? '#4ade80' : d.score >= 4 ? '#fb923c' : '#f87171' }}>{formatScore(d.score)}</b></div>
+                <div>Километри: <b>{formatKm(d.km)}</b></div>
+                <div>Среден разход: <b>{d.cons > 0 ? `${formatConsumption(d.cons)} L/100km` : '—'}</b></div>
             </div>
         );
     }
@@ -108,7 +109,7 @@ export default function CategoryChart({ vehicles, selectedCategory, onCategoryCl
                             opacity={!selectedCategory || selectedCategory === entry.name ? 1 : 0.35}
                         />
                     ))}
-                    <LabelList dataKey="score" position="top" formatter={(v: any) => typeof v === 'number' ? v.toFixed(2) : v} style={{ fill: '#cbd5e1', fontSize: 12, fontWeight: 700 }} />
+                    <LabelList dataKey="score" position="top" formatter={(v: any) => typeof v === 'number' ? formatScore(v) : v} style={{ fill: '#cbd5e1', fontSize: 12, fontWeight: 700 }} />
                 </Bar>
             </BarChart>
         </ResponsiveContainer>

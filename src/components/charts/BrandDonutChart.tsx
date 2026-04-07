@@ -4,6 +4,7 @@ import { useMemo } from 'react';
 import {
     PieChart, Pie, Cell, Tooltip, Legend, ResponsiveContainer
 } from 'recharts';
+import { formatKm } from '../../../lib/formatters';
 import { VehiclePerformance } from '../../../lib/scoring-types';
 
 interface Props {
@@ -28,7 +29,7 @@ const CustomTooltip = ({ active, payload }: any) => {
                 fontSize: '13px'
             }}>
                 <div style={{ fontWeight: 700, marginBottom: 4 }}>{name}</div>
-                <div>{Math.round(value).toLocaleString('bg-BG')} km</div>
+                <div>{formatKm(value)}</div>
                 <div style={{ color: '#94a3b8' }}>{entry.pct}% от общото</div>
             </div>
         );

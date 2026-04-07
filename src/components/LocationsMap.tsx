@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { MapContainer, TileLayer, CircleMarker, Popup, useMap } from 'react-leaflet';
+import { formatScore } from '../../lib/formatters';
 import 'leaflet/dist/leaflet.css';
 
 // Fix for default Leaflet icons in Next.js
@@ -131,7 +132,7 @@ export default function LocationsMap({ data, selectedLocation = [], onLocationSe
                             <Popup>
                                 <div style={{ color: '#111', fontWeight: 600 }}>
                                     <div style={{ fontSize: '16px', marginBottom: '4px' }}>{loc.name}</div>
-                                    <div>Оценка: <span style={{ color }}>{loc.score.toFixed(2)}</span></div>
+                                    <div>Оценка: <span style={{ color }}>{formatScore(loc.score)}</span></div>
                                     <div>Шофьори: {loc.driverCount}</div>
                                 </div>
                             </Popup>

@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo } from 'react';
+import { formatScore } from '../../lib/formatters';
 import {
     BarChart,
     Bar,
@@ -41,7 +42,7 @@ const CustomTooltip = ({ active, payload, label }: any) => {
             }}>
                 <p style={{ margin: '0 0 6px 0', fontSize: '14px', color: '#94a3b8' }}>{label}</p>
                 <p style={{ margin: 0, fontSize: '16px' }}>
-                    Оценка: <span style={{ color }}>{score.toFixed(2)}</span>
+                    Оценка: <span style={{ color }}>{formatScore(score)}</span>
                 </p>
             </div>
         );

@@ -1,6 +1,7 @@
 'use client';
 
 import React from 'react';
+import { formatDecimal } from '../../lib/formatters';
 import type { ScoringWeights } from '../../lib/scoring-types';
 import styles from '../app/dashboard.module.css';
 import {
@@ -180,7 +181,7 @@ export default function ScoringControls({ weights, onChange, onApply, onReset }:
             }}>
                 <div style={{ fontSize: '16px', fontWeight: 600, color: '#4a5568' }}>
                     Общо тегло:{' '}
-                    <span style={{ color: '#1a202c', fontWeight: 800 }}>{total.toFixed(0)}%</span>
+                    <span style={{ color: '#1a202c', fontWeight: 800 }}>{formatDecimal(total, 0)}%</span>
                     <span style={{ fontSize: '13px', color: '#718096', marginLeft: '12px', fontWeight: 400 }}>
                         (Теглата ще бъдат автоматично нормирани)
                     </span>

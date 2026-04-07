@@ -4,6 +4,7 @@ import { useMemo } from 'react';
 import {
     BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell, LabelList
 } from 'recharts';
+import { formatScore } from '../../../lib/formatters';
 import { VehiclePerformance } from '../../../lib/scoring-types';
 
 interface Props {
@@ -26,7 +27,7 @@ const CustomTooltip = ({ active, payload, label }: any) => {
                 fontSize: '13px'
             }}>
                 <div style={{ fontWeight: 700, marginBottom: 4 }}>{label}</div>
-                <div>Средна оценка: <span style={{ color, fontWeight: 700 }}>{score.toFixed(2)}</span></div>
+                <div>Средна оценка: <span style={{ color, fontWeight: 700 }}>{formatScore(score)}</span></div>
                 <div style={{ color: '#94a3b8' }}>Брой: {payload[0]?.payload?.count} авт.</div>
             </div>
         );
@@ -68,7 +69,7 @@ export default function BrandComparisonChart({ vehicles }: Props) {
                     <YAxis dataKey="name" type="category" tick={{ fill: '#e2e8f0', fontSize: 12 }} width={90} stroke="none" />
                     <Tooltip content={<CustomTooltip />} cursor={{ fill: 'rgba(255,255,255,0.04)' }} />
                     <Bar dataKey="score" radius={[0, 4, 4, 0]}>
-                        <LabelList dataKey="score" position="right" formatter={(v: unknown) => typeof v === 'number' ? v.toFixed(2) : ''} style={{ fill: '#94a3b8', fontSize: 11 }} />
+                        <LabelList dataKey="score" position="right" formatter={(v: unknown) => typeof v === 'number' ? formatScore(v) : ''} style={{ fill: '#94a3b8', fontSize: 11 }} />
                         {data.map((entry, i) => {
                             let fill = '#ef4444';
                             if (entry.score >= 7) fill = '#10b981';

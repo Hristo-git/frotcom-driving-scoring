@@ -310,7 +310,7 @@ export class ScoringEngine {
             LEFT JOIN countries c ON d.country_id = c.id
             LEFT JOIN warehouses w ON d.warehouse_id = w.id
             WHERE DATE((es.period_start AT TIME ZONE 'UTC') AT TIME ZONE 'Europe/Sofia') = $1::date
-              AND DATE((es.period_end   AT TIME ZONE 'UTC') AT TIME ZONE 'Europe/Sofia') <= $2::date
+              AND DATE((es.period_end   AT TIME ZONE 'UTC') AT TIME ZONE 'Europe/Sofia') = $2::date
               AND (es.metrics->>'isPeriodSummary')::boolean = true
         `;
         const params: any[] = [startDate, endDate];

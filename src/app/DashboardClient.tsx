@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
+import { formatKm, formatScore, formatConsumption } from '../../lib/formatters';
 import styles from './dashboard.module.css';
 import { useRouter } from 'next/navigation';
 import { PerformanceReport, AggregatedPerformance, ScoringWeights, VehiclePerformance } from '../../lib/scoring-types';
@@ -237,13 +238,15 @@ export default function DashboardClient({
 
     const driversWithConsumption = filteredDrivers.filter(d => d.consumption > 0);
     const distForCons = driversWithConsumption.reduce((acc, d) => acc + (d.distance || 0), 0);
-    const avgConsumption = distForCons > 0
-        ? (driversWithConsumption.reduce((acc, d) => acc + (d.consumption * (d.distance || 0)), 0) / distForCons).toFixed(1)
-        : '0.0';
+    const avgConsumptionNum = distForCons > 0
+        ? (driversWithConsumption.reduce((acc, d) => acc + (d.consumption * (d.distance || 0)), 0) / distForCons)
+        : 0;
+    const avgConsumption = formatConsumption(avgConsumptionNum);
 
-    const overallScore = totalDistance > 0
-        ? (filteredDrivers.reduce((acc, d) => acc + (d.score * (d.distance || 0)), 0) / totalDistance).toFixed(2)
-        : '0.00';
+    const overallScoreNum = totalDistance > 0
+        ? (filteredDrivers.reduce((acc, d) => acc + (d.score * (d.distance || 0)), 0) / totalDistance)
+        : 0;
+    const overallScore = formatScore(overallScoreNum);
 
     const getScoreClass = (score: number) => {
         if (score >= 7.0) return styles.scoreHigh;
@@ -363,10 +366,10 @@ export default function DashboardClient({
             <tr className={styles.clickableRow} onClick={() => setExpandedDriver(expandedDriver === d.driverId ? null : d.driverId)}>
                 <td style={{ fontWeight: 600 }}>{d.driverName}</td>
                 <td style={{ textAlign: 'center', fontSize: '16px', fontWeight: 800 }} className={getScoreClass(d.score)}>
-                    {d.score.toFixed(2)}
+                    {formatScore(d.score)}
                 </td>
                 <td style={{ textAlign: 'right' }}>
-                    {d.distance > 0 ? `${Math.round(d.distance).toLocaleString('bg-BG')} km` : '—'}
+                    {d.distance > 0 ? formatKm(d.distance) : '—'}
                 </td>
             </tr>
             {expandedDriver === d.driverId && (
@@ -392,7 +395,7 @@ export default function DashboardClient({
                                                 </div>
                                                 <div style={{ background: consColor.bg, padding: '4px 8px', borderRadius: '4px', border: `1px solid ${consColor.border}` }}>
                                                     <span style={{ color: '#cbd5e1' }}>Разход: </span>
-                                                    <span style={{ fontWeight: 'bold', color: consColor.text }}>{d.consumption > 0 ? `${d.consumption} L/100km` : `—`}</span>
+                                                    <span style={{ fontWeight: 'bold', color: consColor.text }}>{d.consumption > 0 ? `${formatConsumption(d.consumption)} L/100km` : `—`}</span>
                                                 </div>
                                             </>
                                         );
@@ -408,7 +411,7 @@ export default function DashboardClient({
                                             const trans = EVENT_TRANSLATIONS[key] || { label: key };
                                             const Icon = trans.Icon as any;
                                             const color = getIndicatorColor(key, count as number, d.distance);
-                                            const valPer100 = d.distance > 0 ? (((count as number) / d.distance) * 100).toFixed(1) : (count as number);
+                                            const valPer100 = d.distance > 0 ? formatConsumption((count as number) / d.distance * 100) : (count as number);
 
                                             return (
                                                 <div key={key} style={{
@@ -462,8 +465,8 @@ export default function DashboardClient({
             <header className={styles.topBar}>
                 <div className={styles.brandArea}>
                     <h1 className={styles.title}>Driver<br className={styles.titleBreak} /> Scoring Dashboard</h1>
-                    <div className={styles.subtitle}>
-                        {activeDrivers} шофьори • {totalDistance.toLocaleString('bg-BG')} km общо
+                    <div style={{ color: '#94a3b8', fontSize: '0.9em', fontWeight: 500 }}>
+                        {activeDrivers} шофьори • {formatKm(totalDistance)} общо
                     </div>
                 </div>
 
@@ -590,18 +593,18 @@ export default function DashboardClient({
                                     <div className={styles.cardValue}>{filteredVehicles.length}</div>
                                 </div>
                                 <div className={styles.card}>
-                                    <div className={styles.cardTitle}>Общо Километри (km)</div>
-                                    <div className={styles.cardValue}>{Math.round(filteredKm).toLocaleString('bg-BG')}</div>
+                                    <div className={styles.cardTitle}>Пробег</div>
+                                    <div className={styles.cardValue}>{formatKm(filteredKm)}</div>
                                 </div>
                                 <div className={styles.card}>
                                     <div className={styles.cardTitle}>Средна Оценка</div>
                                     <div className={`${styles.cardValue} ${getScoreClass(avgScore)}`}>
-                                        {avgScore.toFixed(2)}
+                                        {formatScore(avgScore)}
                                     </div>
                                 </div>
                                 <div className={styles.card}>
-                                    <div className={styles.cardTitle}>Среден Разход (L/100km)</div>
-                                    <div className={styles.cardValue}>{avgCons > 0 ? avgCons.toFixed(1) : '—'}</div>
+                                    <div className={styles.cardTitle}>Среден разход</div>
+                                    <div className={styles.cardValue}>{avgCons > 0 ? `${formatConsumption(avgCons)}` : '—'}</div>
                                 </div>
                             </div>
                         );
@@ -702,14 +705,14 @@ export default function DashboardClient({
                                         <td style={{ fontWeight: 500 }}>{v.manufacturer}</td>
                                         <td style={{ fontWeight: 500 }}>{v.model}</td>
                                         <td style={{ textAlign: 'center', fontFamily: 'monospace', fontSize: '1.1em', letterSpacing: '1px' }}>{v.licensePlate}</td>
-                                        <td style={{ textAlign: 'center', fontSize: '1.1em', fontWeight: 800 }} className={getScoreClass(v.score)}>
-                                            {v.score.toFixed(2)}
+                                        <td style={{ textAlign: 'center', fontWeight: 700 }} className={getScoreClass(v.score)}>
+                                            {formatScore(v.score)}
                                         </td>
                                         <td style={{ textAlign: 'right' }}>
-                                            {v.fuelConsumption > 0 ? `${v.fuelConsumption.toFixed(1)} L / 100km` : '—'}
+                                            {v.fuelConsumption > 0 ? `${formatConsumption(v.fuelConsumption)} L/100km` : '—'}
                                         </td>
                                         <td style={{ textAlign: 'right', fontWeight: 600 }}>
-                                            {Math.round(v.distance).toLocaleString('bg-BG')} km
+                                            {formatKm(v.distance)}
                                         </td>
                                     </tr>
                                 )) : (
@@ -770,6 +773,12 @@ export default function DashboardClient({
                                         СРЕДЕН РАЗХОД {getSortIcon('consumption')}
                                     </th>
                                     <th
+                                        style={{ textAlign: 'center', minWidth: 120, cursor: 'pointer' }}
+                                        onClick={() => handleDriverSort('distance')}
+                                    >
+                                        КИЛОМЕТРИ {getSortIcon('distance')}
+                                    </th>
+                                    <th
                                         style={{ textAlign: 'left', minWidth: 200, cursor: 'pointer' }}
                                         onClick={() => handleDriverSort('vehicles')}
                                     >
@@ -796,13 +805,16 @@ export default function DashboardClient({
                                                 </div>
                                             </td>
                                             <td style={{ textAlign: 'center', fontSize: '1.2em', fontWeight: 800 }} className={getScoreClass(d.score)}>
-                                                {d.score.toFixed(2)}
+                                                {formatScore(d.score)}
                                             </td>
                                             <td style={{ textAlign: 'center', color: '#cbd5e1' }}>
                                                 {formatTime(d.drivingTime)} ч.
                                             </td>
                                             <td style={{ textAlign: 'center', color: '#cbd5e1' }}>
-                                                {d.consumption > 0 ? `${d.consumption.toFixed(1)} L/100km` : '—'}
+                                                {d.consumption > 0 ? `${formatConsumption(d.consumption)} L/100km` : '—'}
+                                            </td>
+                                            <td style={{ textAlign: 'center', color: '#cbd5e1' }}>
+                                                {d.distance > 0 ? formatKm(d.distance) : '—'}
                                             </td>
                                             <td style={{ fontSize: '0.9em', color: '#94a3b8' }}>
                                                 {(d.vehicles && d.vehicles.length > 0) ? d.vehicles.join(', ') : '—'}
@@ -810,7 +822,7 @@ export default function DashboardClient({
                                         </tr>
                                         {expandedDriver === d.driverId && (
                                             <tr>
-                                                <td colSpan={5} style={{ padding: '0', background: 'rgba(15, 23, 42, 0.4)' }}>
+                                                <td colSpan={6} style={{ padding: '0', background: 'rgba(15, 23, 42, 0.4)' }}>
                                                     <div style={{ padding: '20px 24px', borderLeft: '4px solid var(--accent-color)' }}>
                                                         <div style={{ fontSize: '0.85em', color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '1px', marginBottom: '16px', fontWeight: 700 }}>
                                                             Препоръки за подобряване на представянето:
@@ -851,7 +863,7 @@ export default function DashboardClient({
                                                         <div style={{ marginTop: '20px', display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: '12px' }}>
                                                             <div style={{ background: 'rgba(255, 255, 255, 0.02)', padding: '10px', borderRadius: '6px', textAlign: 'center' }}>
                                                                 <div style={{ fontSize: '0.75em', color: '#64748b', marginBottom: '4px' }}>ИЗМИНАТО РАЗСТОЯНИЕ</div>
-                                                                <div style={{ fontWeight: 600 }}>{Math.round(d.distance).toLocaleString('bg-BG')} km</div>
+                                                                <div style={{ fontWeight: 600 }}>{formatKm(d.distance)}</div>
                                                             </div>
                                                             <div style={{ background: 'rgba(255, 255, 255, 0.02)', padding: '10px', borderRadius: '6px', textAlign: 'center' }}>
                                                                 <div style={{ fontSize: '0.75em', color: '#64748b', marginBottom: '4px' }}>ОБЩО ВРЕМЕ</div>
@@ -877,7 +889,7 @@ export default function DashboardClient({
                     <div className={styles.grid}>
                         <div className={styles.card}>
                             <div className={styles.cardTitle}>Средна Оценка</div>
-                            <div className={`${styles.cardValue} ${getScoreClass(parseFloat(overallScore))}`}>
+                            <div className={`${styles.cardValue} ${getScoreClass(overallScoreNum)}`}>
                                 {overallScore}
                             </div>
                         </div>
@@ -886,12 +898,12 @@ export default function DashboardClient({
                             <div className={styles.cardValue}>{activeDrivers}</div>
                         </div>
                         <div className={styles.card}>
-                            <div className={styles.cardTitle}>Общо Километри (km)</div>
-                            <div className={styles.cardValue}>{Math.round(totalDistance).toLocaleString('bg-BG')}</div>
+                            <div className={styles.cardTitle}>Общо Километри</div>
+                            <div className={styles.cardValue}>{formatKm(totalDistance)}</div>
                         </div>
                         <div className={styles.card}>
                             <div className={styles.cardTitle}>Среден разход</div>
-                            <div className={styles.cardValue}>{avgConsumption}</div>
+                            <div className={styles.cardValue}>{avgConsumption} L/100km</div>
                         </div>
                     </div>
 

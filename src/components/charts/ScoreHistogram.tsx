@@ -4,6 +4,7 @@ import { useMemo } from 'react';
 import {
     BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell
 } from 'recharts';
+import { formatDecimal } from '../../../lib/formatters';
 import { PerformanceReport } from '../../../lib/scoring-types';
 
 interface Props {
@@ -26,7 +27,7 @@ const CustomTooltip = ({ active, payload, label }: any) => {
                 color: '#e2e8f0',
                 fontSize: '13px'
             }}>
-                <div style={{ fontWeight: 700, marginBottom: 4, color }}>Оценка {label}–{(parseFloat(label) + 1).toFixed(0)}</div>
+                <div style={{ fontWeight: 700, marginBottom: 4, color }}>Оценка {label}–{formatDecimal(parseFloat(label) + 1, 0)}</div>
                 <div>{count} шофьор{count !== 1 ? 'и' : ''}</div>
             </div>
         );

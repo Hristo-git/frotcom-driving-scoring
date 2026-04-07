@@ -5,6 +5,7 @@ import {
     ScatterChart, Scatter, XAxis, YAxis, CartesianGrid, Tooltip,
     ResponsiveContainer, ReferenceLine
 } from 'recharts';
+import { formatScore, formatKm, formatDecimal } from '../../../lib/formatters';
 import { VehiclePerformance } from '../../../lib/scoring-types';
 
 interface Props {
@@ -30,8 +31,8 @@ const CustomTooltip = ({ active, payload }: any) => {
             }}>
                 <div style={{ fontWeight: 700, marginBottom: 4, fontFamily: 'monospace', letterSpacing: 1 }}>{d.plate}</div>
                 <div style={{ color: '#94a3b8', marginBottom: 4 }}>{d.brand} {d.model}</div>
-                <div>Оценка: <span style={{ color, fontWeight: 700 }}>{d.score.toFixed(2)}</span></div>
-                <div>{Math.round(d.km).toLocaleString('bg-BG')} km</div>
+                <div>Оценка: <span style={{ color, fontWeight: 700 }}>{formatScore(d.score)}</span></div>
+                <div>{formatKm(d.km)}</div>
             </div>
         );
     }
@@ -74,7 +75,7 @@ export default function VehicleScatterChart({ vehicles }: Props) {
                     dataKey="km"
                     type="number"
                     name="km"
-                    tickFormatter={(v) => `${(v / 1000).toFixed(0)}k`}
+                    tickFormatter={(v) => `${formatDecimal(v / 1000, 0)}k`}
                     tick={{ fill: '#94a3b8', fontSize: 11 }}
                     stroke="#475569"
                     label={{ value: 'Километри', angle: -90, position: 'insideLeft', offset: 10, fill: '#64748b', fontSize: 11 }}
