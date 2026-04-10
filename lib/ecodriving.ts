@@ -390,10 +390,13 @@ export async function fetchAndStorePeriodScores(start: string, end: string) {
                 vehicles: Array.isArray(record.vehicles) ? record.vehicles : (record.licensePlate ? [record.licensePlate] : []),
             };
 
-            // Use a dedicated period-summary key: period_start = `${start}T00:00:00+PERIOD`
-            // so it never collides with daily rows but is easily queried.
-            const periodKey = `${start}T00:00:00+00:00`;
-            const periodEnd  = `${end}T23:59:59+00:00`;
+            // Use the same plain-date format as daily records.
+            // period_end differs from daily rows (e.g. '2026-04-10' vs '2026-04-01')
+            // so there is no unique-constraint collision.
+            // The read query in scoring.ts converts via AT TIME ZONE 'Europe/Sofia'
+            // which handles plain dates correctly (same as daily records).
+            const periodKey = start;
+            const periodEnd = end;
 
             await pool.query(
                 `INSERT INTO ecodriving_scores (driver_id, period_start, period_end, overall_score, metrics)
