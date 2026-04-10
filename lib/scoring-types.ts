@@ -49,16 +49,16 @@ export interface VehiclePerformance {
 }
 
 export const DEFAULT_WEIGHTS: ScoringWeights = {
-    harshAccelerationLow:  0.90,
-    harshAccelerationHigh: 0.75,
-    harshBrakingLow:       0.65,
-    harshBrakingHigh:      0.75,
+    harshAccelerationLow:  0.85,
+    harshAccelerationHigh: 0.70,
+    harshBrakingLow:       0.75,
+    harshBrakingHigh:      0.60,
     harshCornering:        0.70,
     accelBrakeSwitch:      0.00,
-    excessiveIdling:       0.20,
-    highRPM:               0.22,
+    excessiveIdling:       0.10,
+    highRPM:               0.00,
     alarms:                0.00,
-    noCruiseControl:       0.00,
+    noCruiseControl:       0.30,
     accelDuringCruise:     0.00
 };
 

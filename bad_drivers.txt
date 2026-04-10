@@ -1,0 +1,223 @@
+=== Марјан Трајковски - Скопие ===
+[
+  {
+    "f_score": "6.42",
+    "dist": "366",
+    "events": null,
+    "rpm": "100",
+    "idle": "47.536"
+  },
+  {
+    "f_score": "0.00",
+    "dist": "40",
+    "events": {
+      "idling": 3,
+      "lowSpeedBreak": 2,
+      "highSpeedBreak": 7,
+      "lateralAcceleration": 1,
+      "lowSpeedAcceleration": 1,
+      "highSpeedAcceleration": 2
+    },
+    "rpm": "100",
+    "idle": "195.421"
+  },
+  {
+    "f_score": "4.89",
+    "dist": "128",
+    "events": {
+      "idling": 3,
+      "lateralAcceleration": 1,
+      "lowSpeedAcceleration": 1
+    },
+    "rpm": "100",
+    "idle": "48.001"
+  },
+  {
+    "f_score": "0.00",
+    "dist": "44",
+    "events": {
+      "idling": 1
+    },
+    "rpm": "100",
+    "idle": "260.859"
+  },
+  {
+    "f_score": "6.34",
+    "dist": "472",
+    "events": {
+      "idling": 6,
+      "lateralAcceleration": 1
+    },
+    "rpm": "100",
+    "idle": "31.664"
+  },
+  {
+    "f_score": "5.28",
+    "dist": "172",
+    "events": null,
+    "rpm": "100",
+    "idle": "63.331999999999994"
+  },
+  {
+    "f_score": "0.00",
+    "dist": "5",
+    "events": {
+      "idling": 2,
+      "highSpeedBreak": 1
+    },
+    "rpm": "100",
+    "idle": "1148.333"
+  },
+  {
+    "f_score": "0.00",
+    "dist": "5",
+    "events": null,
+    "rpm": "100",
+    "idle": "220.82200000000003"
+  },
+  {
+    "f_score": "6.14",
+    "dist": "1805",
+    "events": null,
+    "rpm": "100",
+    "idle": "72.678"
+  },
+  {
+    "f_score": "0.00",
+    "dist": "57",
+    "events": null,
+    "rpm": "100",
+    "idle": "87.643"
+  },
+  {
+    "f_score": "6.14",
+    "dist": "1805",
+    "events": null,
+    "rpm": "100",
+    "idle": "72.678"
+  },
+  {
+    "f_score": "9.65",
+    "dist": "100",
+    "events": null,
+    "rpm": "100",
+    "idle": "35.513"
+  },
+  {
+    "f_score": "0.00",
+    "dist": "36",
+    "events": null,
+    "rpm": "100",
+    "idle": "29.943"
+  },
+  {
+    "f_score": "8.22",
+    "dist": "94",
+    "events": null,
+    "rpm": "100",
+    "idle": "148.388"
+  },
+  {
+    "f_score": "0.00",
+    "dist": "7",
+    "events": null,
+    "rpm": "100",
+    "idle": "85.728"
+  },
+  {
+    "f_score": "7.10",
+    "dist": "279",
+    "events": null,
+    "rpm": "100",
+    "idle": "47.15"
+  }
+]
+
+=== Yordan Angelov - Русе ===
+[
+  {
+    "f_score": "0.00",
+    "dist": "0.765",
+    "events": null,
+    "rpm": "100",
+    "idle": "78.68"
+  },
+  {
+    "f_score": "5.10",
+    "dist": "271.805",
+    "events": null,
+    "rpm": "81.656",
+    "idle": "21.56"
+  },
+  {
+    "f_score": "0.00",
+    "dist": "8",
+    "events": null,
+    "rpm": "100",
+    "idle": "85.96"
+  },
+  {
+    "f_score": "0.00",
+    "dist": "44.145",
+    "events": null,
+    "rpm": "-2.5520000000000067",
+    "idle": "37.504"
+  },
+  {
+    "f_score": "3.54",
+    "dist": "344.015",
+    "events": null,
+    "rpm": "72.574",
+    "idle": "15.834"
+  },
+  {
+    "f_score": "3.81",
+    "dist": "1970.715",
+    "events": null,
+    "rpm": "68.98400000000001",
+    "idle": "19.206"
+  },
+  {
+    "f_score": "3.81",
+    "dist": "1975.755",
+    "events": null,
+    "rpm": "69.12",
+    "idle": "19.35"
+  },
+  {
+    "f_score": "3.04",
+    "dist": "101.405",
+    "events": null,
+    "rpm": "2.128",
+    "idle": "33.123"
+  },
+  {
+    "f_score": "3.86",
+    "dist": "237.51",
+    "events": null,
+    "rpm": "65.072",
+    "idle": "19.746"
+  },
+  {
+    "f_score": "4.47",
+    "dist": "453.73",
+    "events": null,
+    "rpm": "70.462",
+    "idle": "6.885"
+  },
+  {
+    "f_score": "2.98",
+    "dist": "243.085",
+    "events": null,
+    "rpm": "78.916",
+    "idle": "22.976"
+  },
+  {
+    "f_score": "4.89",
+    "dist": "266.255",
+    "events": null,
+    "rpm": "80.289",
+    "idle": "17.076"
+  }
+]
+

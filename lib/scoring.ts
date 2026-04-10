@@ -111,7 +111,8 @@ export class ScoringEngine {
             { score: catScores.brakeHigh, weight: weights.harshBrakingHigh },
             { score: catScores.corner,    weight: weights.harshCornering },
             { score: catScores.idle,      weight: weights.excessiveIdling },
-            { score: catScores.rpm,       weight: rpmSensorAvailable ? weights.highRPM : 0 }
+            { score: catScores.rpm,       weight: rpmSensorAvailable ? weights.highRPM : 0 },
+            { score: catScores.noCruise || 10.0, weight: weights.noCruiseControl || 0 }
         ];
 
         let totalWeightedScore = 0;
@@ -156,7 +157,8 @@ export class ScoringEngine {
             brakeHigh: this.calculateCategoryScore((eventCounts.highSpeedBreak || 0) / distRatio, 'harshBrakingHigh'),
             corner:    this.calculateCategoryScore((eventCounts.lateralAcceleration || 0) / distRatio, 'harshCornering'),
             idle:      this.calculateCategoryScore(metrics.idleTimePerc || 0, 'excessiveIdling'),
-            rpm:       rpmSensorAvailable ? this.calculateCategoryScore(rpmPerc, 'highRPM') : 10.0
+            rpm:       rpmSensorAvailable ? this.calculateCategoryScore(rpmPerc, 'highRPM') : 10.0,
+            noCruise:  10.0 // Defaulting to 10.0 since cruise control metrics are currently missing from the DB
         };
     }
 
@@ -349,24 +351,46 @@ export class ScoringEngine {
             evByDriver.get(ev.driver_id)![ev.event_type] = parseInt(ev.count);
         });
 
-        return res.rows.map(row => ({
-            driverId:        row.driver_id,
-            driverName:      row.name,
-            country:         row.country || 'Other',
-            warehouse:       row.warehouse || 'Other',
-            countryId:       row.country_id,
-            warehouseId:     row.warehouse_id,
-            score:           parseFloat(parseFloat(row.overall_score).toFixed(2)),
-            distance:        parseFloat((parseFloat(row.metrics.mileage) || 0).toFixed(1)),
-            drivingTime:     Math.round(parseFloat(row.metrics.drivingTime) || 0),
-            idling:          parseFloat((parseFloat(row.metrics.idleTimePerc) || 0).toFixed(2)),
-            consumption:     parseFloat((parseFloat(row.metrics.averageConsumption) || 0).toFixed(2)),
-            rpm:             parseFloat((parseFloat(row.metrics.highRPMPerc) || 0).toFixed(2)),
-            vehicles:        Array.isArray(row.metrics.vehicles) ? (row.metrics.vehicles as string[]).map(p => p.replace(/-[БЦбц]$/, "")) : [],
-            recommendations: Array.isArray(row.metrics.failingCriteria) ? row.metrics.failingCriteria : [],
-            dataPoints:      1,
-            events:          evByDriver.get(row.driver_id) || {},
-        })).sort((a, b) => b.score - a.score);
+        const weights = options?.weights || DEFAULT_WEIGHTS;
+
+        return res.rows.map(row => {
+            const isCustomDriver = row.name.startsWith('*');
+            let finalScore = parseFloat(row.overall_score);
+
+            if (isCustomDriver) {
+                const distance = parseFloat(row.metrics.mileage) || 0;
+                const events = evByDriver.get(row.driver_id) || {};
+                const idle = parseFloat(row.metrics.idleTimePerc) || 0;
+                const rpm = parseFloat(row.metrics.highRPMPerc) || 0;
+
+                const recEngine = new ScoringEngine();
+                finalScore = recEngine.calculateCustomScore({
+                    mileage: distance,
+                    eventCounts: events,
+                    idleTimePerc: idle,
+                    highRPMPerc: rpm
+                }, weights);
+            }
+
+            return {
+                driverId:        row.driver_id,
+                driverName:      row.name,
+                country:         row.country || 'Other',
+                warehouse:       row.warehouse || 'Other',
+                countryId:       row.country_id,
+                warehouseId:     row.warehouse_id,
+                score:           parseFloat(finalScore.toFixed(2)),
+                distance:        parseFloat((parseFloat(row.metrics.mileage) || 0).toFixed(1)),
+                drivingTime:     Math.round(parseFloat(row.metrics.drivingTime) || 0),
+                idling:          parseFloat((parseFloat(row.metrics.idleTimePerc) || 0).toFixed(2)),
+                consumption:     parseFloat((parseFloat(row.metrics.averageConsumption) || 0).toFixed(2)),
+                rpm:             parseFloat((parseFloat(row.metrics.highRPMPerc) || 0).toFixed(2)),
+                vehicles:        Array.isArray(row.metrics.vehicles) ? (row.metrics.vehicles as string[]).map(p => p.replace(/-[БЦбц]$/, "")) : [],
+                recommendations: Array.isArray(row.metrics.failingCriteria) ? row.metrics.failingCriteria : [],
+                dataPoints:      1,
+                events:          evByDriver.get(row.driver_id) || {},
+            };
+        }).sort((a, b) => b.score - a.score);
     }
 
     private async _getDriverPerformanceFromDailyDB(start: string, end: string, options?: { countryNames?: string[], warehouseNames?: string[], weights?: ScoringWeights, driverIds?: number[] }): Promise<PerformanceReport[]> {
@@ -407,12 +431,17 @@ export class ScoringEngine {
                     totalDistance: 0, totalDistanceForWeights: 0,
                     totalDrivingTime: 0, totalIdlingWeighted: 0,
                     totalConsumptionWeighted: 0, totalRPMWeighted: 0,
+                    totalScoreWeighted: 0,
                     vehicles: new Set<string>(), recommendations: new Set<string>(),
                     events: {} as Record<string, number>, count: 0,
                 });
             }
             const d = driverMap.get(driverId);
             if (distance > 0) {
+                const rowScore = parseFloat(row.overall_score);
+                if (!isNaN(rowScore)) {
+                    d.totalScoreWeighted += rowScore * distance;
+                }
                 d.totalIdlingWeighted      += (parseFloat(row.metrics.idleTimePerc) || 0)       * distance;
                 d.totalConsumptionWeighted += (parseFloat(row.metrics.averageConsumption) || 0) * distance;
                 d.totalRPMWeighted         += (parseFloat(row.metrics.highRPMPerc) || 0)        * distance;
@@ -455,6 +484,14 @@ export class ScoringEngine {
                 highRPMPerc: rpmAvg
             }, weights);
 
+            // Use weighted average if we have daily Frotcom scores AND it's not a custom driver
+            const isCustomDriver = d.name.startsWith('*');
+            const weightedScore = d.totalDistanceForWeights > 0 ? d.totalScoreWeighted / d.totalDistanceForWeights : 0;
+            
+            const finalScore = (weightedScore > 0 && !isCustomDriver) 
+                ? weightedScore 
+                : recalculatedScore;
+
             return {
                 driverId:        d.driver_id,
                 driverName:      d.name,
@@ -462,7 +499,7 @@ export class ScoringEngine {
                 warehouse:       d.warehouse || 'Other',
                 countryId:       d.country_id,
                 warehouseId:     d.warehouse_id,
-                score:           parseFloat(recalculatedScore.toFixed(2)),
+                score:           parseFloat(finalScore.toFixed(2)),
                 distance:        parseFloat(d.totalDistance.toFixed(1)),
                 drivingTime:     Math.round(d.totalDrivingTime),
                 idling:          parseFloat(idleAvg.toFixed(2)),

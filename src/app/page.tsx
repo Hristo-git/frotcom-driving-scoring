@@ -67,22 +67,23 @@ export default async function DashboardPage(props: {
         accelDuringCruise: getW('adc', DEFAULT_WEIGHTS.accelDuringCruise),
     };
 
-    // Cache per unique combination of start/end/filters — revalidate after 5 min
+    // Cache per unique combination of start/end/filters/weights — revalidate after 5 min
     const fetchDashboardData = unstable_cache(
-        async (s: string, e: string, countries?: string[], warehouses?: string[]) => {
+        async (s: string, e: string, countries?: string[], warehouses?: string[], weightsJson?: string) => {
+            const w: ScoringWeights = weightsJson ? JSON.parse(weightsJson) : weights;
             return Promise.all([
-                engine.getDriverPerformance(s, e, { weights, countryNames: countries, warehouseNames: warehouses }),
-                engine.getCountryPerformance(s, e, { warehouseNames: warehouses, weights }),
-                engine.getWarehousePerformance(s, e, weights, { countryNames: countries }),
-                engine.getVehiclePerformance(s, e, { weights, countryNames: countries, warehouseNames: warehouses }),
+                engine.getDriverPerformance(s, e, { weights: w, countryNames: countries, warehouseNames: warehouses }),
+                engine.getCountryPerformance(s, e, { warehouseNames: warehouses, weights: w }),
+                engine.getWarehousePerformance(s, e, w, { countryNames: countries }),
+                engine.getVehiclePerformance(s, e, { weights: w, countryNames: countries, warehouseNames: warehouses }),
             ]);
         },
-        ['dashboard-data'],
+        ['dashboard-data-v2'],
         { revalidate: 300, tags: ['dashboard'] }
     );
 
     const [drivers, countries, warehouses, vehicles] = await fetchDashboardData(
-        start, end, selectedCountry, selectedWarehouse
+        start, end, selectedCountry, selectedWarehouse, JSON.stringify(weights)
     );
 
     // console.log(`Fetched: ${drivers.length} drivers, ${countries.length} countries, ${warehouses.length} warehouses, ${vehicles.length} vehicles`);

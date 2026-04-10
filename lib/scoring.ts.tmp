@@ -1,0 +1,147 @@
+import pool from './db';
+import { SCORING_SCALES } from './scoring-scales';
+import { 
+    ScoringWeights, 
+    PerformanceReport, 
+    AggregatedPerformance, 
+    VehiclePerformance, 
+    DEFAULT_WEIGHTS,
+    RECOMMENDATION_LABELS
+} from './scoring-types';
+
+export { 
+    type ScoringWeights, 
+    type PerformanceReport, 
+    type AggregatedPerformance, 
+    type VehiclePerformance, 
+    DEFAULT_WEIGHTS,
+    RECOMMENDATION_LABELS
+};
+
+const THRESHOLD_MAPPING: Record<string, { min: number, max: number }> = {
+    highRPM: { min: 0.0, max: 35.0 },
+    excessiveIdling: { min: 0.0, max: 50.0 }
+};
+
+/**
+ * Scoring Engine for Drivers
+ */
+export class ScoringEngine {
+    private currentWeights: ScoringWeights;
+
+    constructor(weights: ScoringWeights = DEFAULT_WEIGHTS) {
+        this.currentWeights = weights;
+    }
+
+    /**
+     * Calculates a category score (1.0 - 10.0) based on event density or percentage.
+     * Uses official Frotcom step-wise benchmarks for Safety categories.
+     */
+    calculateCategoryScore(value: number, category: string): number {
+        // Handle official Safety Scales
+        if (category in SCORING_SCALES) {
+            const scale = SCORING_SCALES[category as keyof typeof SCORING_SCALES];
+            
+            // If value is below or equal to the 10.0 threshold
+            if (value <= scale[0]) return 10.0;
+            
+            // If value is above the 1.0 threshold (the last point represents score 2.0)
+            if (value > scale[scale.length - 1]) return 1.0;
+
+            // Otherwise, find the two points in the scale to interpolate between
+            // scale[0] = 10.0, scale[1] = 9.0 ... scale[8] = 2.0
+            for (let i = 0; i < scale.length - 1; i++) {
+                if (value >= scale[i] && value <= scale[i+1]) {
+                    const upperScore = 10 - i;
+                    const lowerScore = 10 - (i+1);
+                    const upperVal = scale[i];
+                    const lowerVal = scale[i+1];
+                    
+                    const ratio = (value - upperVal) / (lowerVal - upperVal);
+                    return upperScore - (ratio * (upperScore - lowerScore));
+                }
+            }
+            return 1.0;
+        }
+
+        // Fallback for non-safety categories (RPM, Idling) which use linear mapping
+        const mapping = THRESHOLD_MAPPING[category];
+        if (!mapping) return 10.0;
+
+        const { min, max } = mapping;
+        if (value <= min) return 10.0;
+        if (value >= max) return 1.0;
+
+        return 10.0 - ((value - min) / (max - min)) * 9.0;
+    }
+
+    /**
+     * Weighted Average Scoring Model
+     */
+    public calculateCustomScore(metrics: any, weights: ScoringWeights): number {
+        const mileage = metrics.mileage || 0;
+        
+        if (mileage < 10 || metrics.hasLowMileage) {
+            const eventCounts = metrics.eventCounts || {};
+            const hasEvents = Object.values(eventCounts).some(v => (v as number) > 0);
+            if (!hasEvents) return 0.00;
+        }
+
+        const distRatio = mileage / 100;
+        if (distRatio <= 0) return 10.0;
+
+        const eventCounts = metrics.eventCounts || {};
+        
+        const catScores = {
+            accelLow: this.calculateCategoryScore((eventCounts.lowSpeedAcceleration || 0) / distRatio, 'harshAccelerationLow'),
+            accelHigh: this.calculateCategoryScore((eventCounts.highSpeedAcceleration || 0) / distRatio, 'harshAccelerationHigh'),
+            brakeLow: this.calculateCategoryScore((eventCounts.lowSpeedBreak || 0) / distRatio, 'harshBrakingLow'),
+            brakeHigh: this.calculateCategoryScore(((eventCounts.highSpeedBreak || 0) + (eventCounts.accelBrakeFastShift || 0)) / distRatio, 'harshBrakingHigh'),
+            corner: this.calculateCategoryScore((eventCounts.lateralAcceleration || 0) / distRatio, 'harshCornering'),
+            idle: this.calculateCategoryScore(metrics.idleTimePerc || 0, 'excessiveIdling'),
+            rpm: this.calculateCategoryScore(metrics.highRPMPerc || 0, 'highRPM')
+        };
+
+        const weightedMap = [
+            { score: catScores.accelLow, weight: weights.harshAccelerationLow },
+            { score: catScores.accelHigh, weight: weights.harshAccelerationHigh },
+            { score: catScores.brakeLow, weight: weights.harshBrakingLow },
+            { score: catScores.brakeHigh, weight: weights.harshBrakingHigh },
+            { score: catScores.corner, weight: weights.harshCornering },
+            { score: catScores.idle, weight: weights.excessiveIdling },
+            { score: catScores.rpm, weight: weights.highRPM }
+        ];
+
+        let totalWeightedScore = 0;
+        let totalWeight = 0;
+
+        weightedMap.forEach(item => {
+            if (item.weight > 0) {
+                totalWeightedScore += item.score * item.weight;
+                totalWeight += item.weight;
+            }
+        });
+
+        if (totalWeight === 0) return 10.0;
+        
+        const finalScore = totalWeightedScore / totalWeight;
+        return Math.min(10, Math.max(1, finalScore));
+    }
+
+    public calculateDetailedScores(metrics: any, weights: ScoringWeights): Record<string, number> {
+        const mileage = metrics.mileage || 0;
+        const distRatio = mileage / 100;
+        if (distRatio <= 0) return {};
+
+        const eventCounts = metrics.eventCounts || {};
+        
+        return {
+            accelLow: this.calculateCategoryScore((eventCounts.lowSpeedAcceleration || 0) / distRatio, 'harshAccelerationLow'),
+            accelHigh: this.calculateCategoryScore((eventCounts.highSpeedAcceleration || 0) / distRatio, 'harshAccelerationHigh'),
+            brakeLow: this.calculateCategoryScore((eventCounts.lowSpeedBreak || 0) / distRatio, 'harshBrakingLow'),
+            brakeHigh: this.calculateCategoryScore(((eventCounts.highSpeedBreak || 0) + (eventCounts.accelBrakeFastShift || 0)) / distRatio, 'harshBrakingHigh'),
+            corner: this.calculateCategoryScore((eventCounts.lateralAcceleration || 0) / distRatio, 'harshCornering'),
+            idle: this.calculateCategoryScore(metrics.idleTimePerc || 0, 'excessiveIdling'),
+            rpm: this.calculateCategoryScore(metrics.highRPMPerc || 0, 'highRPM')
+        };
+    }

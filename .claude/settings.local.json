@@ -1,0 +1,41 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(find /c/Users/Hristo0203/Frotcom/frotcom-driver-scoring/src -type f -name *.ts -o -name *.tsx -o -name *.js -o -name *.json)",
+      "Bash(find /c/Users/Hristo0203/Frotcom/frotcom-driver-scoring/lib -type f -name *.ts -o -name *.js -o -name *.json)",
+      "Bash(find /c/Users/Hristo0203/Frotcom/frotcom-driver-scoring -type f \\\\\\(-name *.json -o -name *.csv -o -name *.txt \\\\\\) ! -path ./.next/* ! -path ./node_modules/* ! -path ./.git/* ! -path ./logs/* ! -path ./temp/* ! -path ./tmp/*)",
+      "Bash(npx dotenvx:*)",
+      "Bash(npm list:*)",
+      "Bash(npx --yes tsx@4.19.2 scripts/test-per-period-approach.ts)",
+      "Bash(npx tsx@4.19.2 scripts/test-per-period-approach.ts)",
+      "Bash(npx tsx@4.19.2 -e \":*)",
+      "Bash(npx tsx@4.19.2 scripts/list-drivers.ts)",
+      "Bash(npx tsx@4.19.2 scripts/inspect-drivers.ts)",
+      "Bash(npx tsx@4.19.2 -e \"import pool from ''./lib/db''; pool.query\\(''SELECT * FROM warehouses LIMIT 10''\\).then\\(r => { process.stdout.write\\(JSON.stringify\\(r.rows\\) + ''\\\\n''\\); pool.end\\(\\); }\\);\")",
+      "Bash(npx tsx@4.19.2 scripts/check-driver-values.ts)",
+      "Bash(timeout 20 npx tsx@4.19.2 scripts/nikolai-parity-check.ts)",
+      "Bash(npx tsx@4.19.2 scripts/test-frotcom-weights.ts)",
+      "Bash(npx tsx@4.19.2 scripts/query-bad-drivers.ts)",
+      "Bash(npx tsx@4.19.2 scripts/check-problem-drivers.ts)",
+      "Bash(node -e \":*)",
+      "Bash(npm install:*)",
+      "Bash(npx tsx@4.19.2 scripts/reverse-engineer-xlsx.ts)",
+      "Bash(npx tsc:*)",
+      "Bash(npx tsx@4.19.2 scripts/verify-parity-fix.ts)",
+      "Bash(npx tsx@4.19.2 scripts/check-stored-scores.ts)",
+      "Bash(find C:/Users/Hristo0203/Frotcom/frotcom-driver-scoring/src -name *.ts -o -name *.tsx)",
+      "Bash(npx tsx@4.19.2 scripts/check-api-vs-xlsx.ts)",
+      "Bash(npx tsx@4.19.2 scripts/populate-period-scores.ts)",
+      "Bash(npx ts-node -e \":*)",
+      "Bash(npx ts-node:*)",
+      "Bash(npx tsx:*)",
+      "Bash(npx tsx -e \":*)",
+      "Bash(git add:*)",
+      "Bash(git commit:*)",
+      "Bash(git push:*)",
+      "mcp__claude_ai_Supabase__list_projects",
+      "Bash(npx ts-node --project scripts/tsconfig.scripts.json -e \":*)",
+      "Bash(npx next:*)"
+    ]
+  }
+}
