@@ -58,7 +58,7 @@ export const DEFAULT_WEIGHTS: ScoringWeights = {
     excessiveIdling:       0.10,
     highRPM:               0.00,
     alarms:                0.00,
-    noCruiseControl:       0.30,
+    noCruiseControl:       0.00,
     accelDuringCruise:     0.00
 };
 
