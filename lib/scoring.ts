@@ -101,7 +101,8 @@ export class ScoringEngine {
             brakeHigh: this.calculateCategoryScore((eventCounts.highSpeedBreak || 0) / distRatio, 'harshBrakingHigh'),
             corner:    this.calculateCategoryScore((eventCounts.lateralAcceleration || 0) / distRatio, 'harshCornering'),
             idle:      this.calculateCategoryScore(metrics.idleTimePerc || 0, 'excessiveIdling'),
-            rpm:       this.calculateCategoryScore(rpmPerc, 'highRPM')
+            rpm:       this.calculateCategoryScore(rpmPerc, 'highRPM'),
+            noCruise:  10.0 // Defaulting to 10.0 to prevent penalties until correctly mapped
         };
 
         const weightedMap = [
