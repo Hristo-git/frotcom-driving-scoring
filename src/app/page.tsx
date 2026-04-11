@@ -20,18 +20,27 @@ export default async function DashboardPage(props: {
         console.error('DATABASE_URL is not defined in environment variables!');
     }
 
-    // Default to current month; if 1st or 2nd of month, default to previous month
-    const now = new Date();
-    const targetMonth = now.getUTCDate() <= 2
-        ? now.getUTCMonth() - 1  // previous month (Date.UTC handles negative correctly)
-        : now.getUTCMonth();
-    const targetYear = now.getUTCFullYear();
+    // Default to current month: start = 1st of month, end = today (Sofia tz).
+    // If 1st or 2nd of month, default to the previous full month instead.
+    const nowMs = Date.now();
+    const sofiaStr = new Date(nowMs).toLocaleDateString('sv-SE', { timeZone: 'Europe/Sofia' }); // YYYY-MM-DD
+    const [sy, sm, sd] = sofiaStr.split('-').map(Number);
+
+    const usePrevMonth = sd <= 2;
+    const targetMonth = usePrevMonth ? sm - 2 : sm - 1; // 0-indexed
+    const targetYear = sy;
 
     const firstDay = new Date(Date.UTC(targetYear, targetMonth, 1));
     const startStr = firstDay.toISOString();
 
-    const lastDay = new Date(Date.UTC(targetYear, targetMonth + 1, 0, 23, 59, 59, 999));
-    const endStr = lastDay.toISOString();
+    // End of range: today for current month, last day for previous month
+    let endStr: string;
+    if (usePrevMonth) {
+        const lastDay = new Date(Date.UTC(targetYear, targetMonth + 1, 0));
+        endStr = lastDay.toISOString();
+    } else {
+        endStr = `${sofiaStr}T23:59:59.999Z`;
+    }
 
     const start = (searchParams?.start as string) || startStr;
     const end = (searchParams?.end as string) || endStr;
