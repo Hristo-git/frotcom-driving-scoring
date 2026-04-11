@@ -322,8 +322,8 @@ export class ScoringEngine {
             JOIN drivers d ON es.driver_id = d.id
             LEFT JOIN countries c ON d.country_id = c.id
             LEFT JOIN warehouses w ON d.warehouse_id = w.id
-            WHERE DATE((es.period_start AT TIME ZONE 'UTC') AT TIME ZONE 'Europe/Sofia') = $1::date
-              AND DATE((es.period_end   AT TIME ZONE 'UTC') AT TIME ZONE 'Europe/Sofia') = $2::date
+            WHERE es.period_start::date = $1::date
+              AND es.period_end::date = $2::date
               AND (es.metrics->>'isPeriodSummary')::boolean = true
         `;
         const params: any[] = [startDate, endDate];
@@ -343,7 +343,7 @@ export class ScoringEngine {
         const eventRes = await pool.query(`
             SELECT driver_id, event_type, COUNT(*) as count
             FROM ecodriving_events
-            WHERE DATE((started_at AT TIME ZONE 'UTC') AT TIME ZONE 'Europe/Sofia') BETWEEN $1::date AND $2::date
+            WHERE started_at::date BETWEEN $1::date AND $2::date
             GROUP BY driver_id, event_type
         `, [start, end]);
         const evByDriver = new Map<number, Record<string, number>>();
@@ -404,8 +404,8 @@ export class ScoringEngine {
             JOIN drivers d ON es.driver_id = d.id
             LEFT JOIN countries c ON d.country_id = c.id
             LEFT JOIN warehouses w ON d.warehouse_id = w.id
-            WHERE DATE((es.period_start AT TIME ZONE 'UTC') AT TIME ZONE 'Europe/Sofia') >= $1::date
-              AND DATE((es.period_start AT TIME ZONE 'UTC') AT TIME ZONE 'Europe/Sofia') <= $2::date
+            WHERE es.period_start::date >= $1::date
+              AND es.period_start::date <= $2::date
               AND (es.metrics->>'isPeriodSummary') IS NULL
               AND jsonb_typeof(es.metrics->'vehicles') = 'array'
               AND jsonb_array_length(es.metrics->'vehicles') > 0
