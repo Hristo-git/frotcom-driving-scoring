@@ -36,7 +36,7 @@ export async function GET(request: NextRequest) {
 
         // 2. Sync Ecodriving Scores (yesterday — complete day)
         console.log(`[Cron] Step 2: Fetching daily scores for ${sofiaYesterday}...`);
-        await fetchAndStoreEcodriving(sofiaYesterday, sofiaYesterday);
+        await fetchAndStoreEcodriving(`${sofiaYesterday}T00:00:00`, `${sofiaYesterday}T23:59:59`);
 
         // 3. Sync Ecodriving Events (yesterday)
         console.log(`[Cron] Step 3: Fetching events for ${sofiaYesterday}...`);

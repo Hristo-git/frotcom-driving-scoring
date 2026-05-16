@@ -480,6 +480,8 @@ export default function DashboardClient({
 
     const activeFilterCount = selectedCountry.length + selectedWarehouse.length;
 
+    const [isMobileFilterOpen, setIsMobileFilterOpen] = useState(false);
+
     return (
         <div className={styles.container}>
             {/* ── TOP BAR ── */}
@@ -491,6 +493,21 @@ export default function DashboardClient({
                     </div>
                 </div>
 
+                {/* Mobile Filter Trigger */}
+                <button 
+                    className={`${styles.button} ${styles.mobileFilterBtn}`} 
+                    onClick={() => setIsMobileFilterOpen(true)}
+                    style={{ padding: '8px 12px', display: 'flex', alignItems: 'center', gap: '6px' }}
+                >
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/></svg>
+                    Филтри
+                    {activeFilterCount > 0 && (
+                        <span style={{ background: 'white', color: 'var(--accent-primary)', borderRadius: '50%', width: 18, height: 18, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, fontWeight: 'bold' }}>
+                            {activeFilterCount}
+                        </span>
+                    )}
+                </button>
+
                 {/* Desktop nav */}
                 <nav className={styles.navTabs}>
                     <button className={`${styles.navTab} ${view === 'report' ? styles.navTabActive : ''}`} onClick={() => setView('report')}>Отчети</button>
@@ -499,9 +516,19 @@ export default function DashboardClient({
                 </nav>
             </header>
 
+            {/* Mobile Filter Backdrop */}
+            {isMobileFilterOpen && (
+                <div className={styles.filterBackdrop} onClick={() => setIsMobileFilterOpen(false)} />
+            )}
+
             {/* ── FILTER BAR ── */}
-            <div className={styles.filterBar}>
+            <div className={`${styles.filterBar} ${isMobileFilterOpen ? styles.filterBarOpen : ''}`}>
+                <div className={styles.filterHeaderMobile}>
+                    <h3>Филтри</h3>
+                    <button onClick={() => setIsMobileFilterOpen(false)} className={styles.closeModalBtn}>✕</button>
+                </div>
                 {/* City chips */}
+                <div className={styles.filterSectionTitleMobile}>Град</div>
                 <div className={styles.cityChips}>
                     <button
                         className={`${styles.chip} ${selectedCountry.length === 0 ? styles.chipActive : ''}`}
@@ -519,7 +546,7 @@ export default function DashboardClient({
                     ))}
                 </div>
 
-                {/* Date range */}
+                <div className={styles.filterSectionTitleMobile} style={{ marginTop: '16px' }}>Период</div>
                 <div className={styles.dateSection}>
                     <div className={styles.monthShortcuts}>
                         {monthShortcuts.map(m => (
@@ -765,7 +792,7 @@ export default function DashboardClient({
                         </div>
                     </div>
 
-                    <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '16px' }}>
+                    <div className={styles.hideOnMobile} style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '16px' }}>
                         <button className={styles.button} onClick={handleExportExcel} style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
                             Експорт в Excel

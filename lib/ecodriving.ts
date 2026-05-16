@@ -62,6 +62,10 @@ interface DriverAggregate {
 }
 
 export async function fetchAndStoreEcodriving(start: string, end: string) {
+    // Normalize dates to prevent unique-constraint bypasses caused by varying timestamp formats
+    if (start.length === 10) start += 'T00:00:00';
+    if (end.length === 10) end += 'T23:59:59';
+
     console.log(`Fetching ecodriving data from '${start}' to '${end}'`);
 
     try {
@@ -356,6 +360,10 @@ export async function fetchAndStoreEcodriving(start: string, end: string) {
  * avoiding the aggregation bias from daily-score averaging.
  */
 export async function fetchAndStorePeriodScores(start: string, end: string) {
+    // Normalize dates to prevent unique-constraint bypasses caused by varying timestamp formats
+    if (start.length === 10) start += 'T00:00:00';
+    if (end.length === 10) end += 'T23:59:59';
+
     console.log(`[PeriodSync] Fetching period scores ${start} → ${end}`);
     try {
         const driverMap = new Map<string, number>();

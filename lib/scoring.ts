@@ -335,9 +335,9 @@ export class ScoringEngine {
 
         const res = await pool.query(query, params);
 
-        // If no cached period summaries yet, fall back to daily aggregation
+        // If no cached period summaries yet, return empty array to trigger API fallback in getDriverPerformance
         if (res.rows.length === 0) {
-            return this._getDriverPerformanceFromDailyDB(start, end, options);
+            return [];
         }
 
         const eventRes = await pool.query(`
