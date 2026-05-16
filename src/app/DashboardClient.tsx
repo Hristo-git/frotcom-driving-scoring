@@ -97,6 +97,10 @@ export default function DashboardClient({
     const [showCustomDate, setShowCustomDate] = useState(false);
     const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
 
+    // ── Client-side filter state (instant, no server round-trip) ──
+    const [activeCountry, setActiveCountry] = useState<string[]>(selectedCountry);
+    const [activeWarehouse, setActiveWarehouse] = useState<string[]>(selectedWarehouse);
+
     const monthShortcuts = (() => {
         const now = new Date();
         return Array.from({ length: 4 }, (_, i) => {
@@ -118,8 +122,9 @@ export default function DashboardClient({
         const params = new URLSearchParams();
         params.set('start', `${newStart}T00:00:00.000Z`);
         params.set('end', `${newEnd}T23:59:59.999Z`);
-        if (selectedCountry.length > 0) selectedCountry.forEach(c => params.append('country', c));
-        if (selectedWarehouse.length > 0) selectedWarehouse.forEach(w => params.append('warehouse', w));
+        // Persist current client-side filters in URL so they survive the reload
+        if (activeCountry.length > 0) activeCountry.forEach(c => params.append('country', c));
+        if (activeWarehouse.length > 0) activeWarehouse.forEach(w => params.append('warehouse', w));
         if (selectedBrand.length > 0) selectedBrand.forEach(b => params.append('brand', b));
         if (selectedModel.length > 0) selectedModel.forEach(m => params.append('model', m));
         Object.entries(currentWeights).forEach(([key, val]) => {
@@ -155,31 +160,48 @@ export default function DashboardClient({
         router.push(`/?${params.toString()}`);
     };
 
+    // ── Instant client-side filter toggles (no server round-trip) ──
     const toggleFilter = (type: 'country' | 'warehouse' | 'brand' | 'model', value: string) => {
-        const params = new URLSearchParams(window.location.search);
-        const currentValues = params.getAll(type);
-
-        if (currentValues.includes(value)) {
-            // Remove
-            const newValues = currentValues.filter(v => v !== value);
-            params.delete(type);
-            newValues.forEach(v => params.append(type, v));
-            // If country removed, also clear warehouses
-            if (type === 'country') params.delete('warehouse');
+        if (type === 'country') {
+            setActiveCountry(prev =>
+                prev.includes(value)
+                    ? prev.filter(v => v !== value)
+                    : [...prev, value]
+            );
+            // Clear warehouses when country changes
+            setActiveWarehouse([]);
+        } else if (type === 'warehouse') {
+            setActiveWarehouse(prev =>
+                prev.includes(value)
+                    ? prev.filter(v => v !== value)
+                    : [...prev, value]
+            );
         } else {
-            // Add
-            params.append(type, value);
-            // If country added, we don't necessarily clear warehouses, as it's multi-select now
+            // brand/model still use URL (they affect vehicle scoring data)
+            const params = new URLSearchParams(window.location.search);
+            const currentValues = params.getAll(type);
+            if (currentValues.includes(value)) {
+                const newValues = currentValues.filter(v => v !== value);
+                params.delete(type);
+                newValues.forEach(v => params.append(type, v));
+            } else {
+                params.append(type, value);
+            }
+            router.push(`/?${params.toString()}`);
         }
-
-        router.push(`/?${params.toString()}`);
     };
 
     const removeFilter = (type: 'country' | 'warehouse' | 'brand' | 'model') => {
-        const params = new URLSearchParams(window.location.search);
-        params.delete(type);
-        if (type === 'country') params.delete('warehouse');
-        router.push(`/?${params.toString()}`);
+        if (type === 'country') {
+            setActiveCountry([]);
+            setActiveWarehouse([]);
+        } else if (type === 'warehouse') {
+            setActiveWarehouse([]);
+        } else {
+            const params = new URLSearchParams(window.location.search);
+            params.delete(type);
+            router.push(`/?${params.toString()}`);
+        }
     };
 
     const handleDriverSort = (field: string) => {
@@ -216,6 +238,10 @@ export default function DashboardClient({
     const vehicleMap = React.useMemo(() => new Map(vehicles.map(v => [v.licensePlate, v])), [vehicles]);
 
     const filteredDrivers = React.useMemo(() => drivers.filter(d => {
+        // Client-side country/warehouse filter (instant)
+        if (activeCountry.length > 0 && !activeCountry.includes(d.country)) return false;
+        if (activeWarehouse.length > 0 && !activeWarehouse.includes(d.warehouse)) return false;
+        // Brand/model filter
         if (selectedBrand.length === 0 && selectedModel.length === 0) return true;
         return d.vehicles.some(plate => {
             const v = vehicleMap.get(plate);
@@ -224,7 +250,7 @@ export default function DashboardClient({
             const modelMatch = selectedModel.length === 0 || selectedModel.includes(v.model);
             return brandMatch && modelMatch;
         });
-    }), [drivers, selectedBrand, selectedModel, vehicleMap]);
+    }), [drivers, activeCountry, activeWarehouse, selectedBrand, selectedModel, vehicleMap]);
 
     const filteredVehicles = React.useMemo(() => vehicles.filter(v => {
         if (selectedBrand.length > 0 && !selectedBrand.includes(v.manufacturer)) return false;
@@ -564,7 +590,7 @@ export default function DashboardClient({
     );
     };
 
-    const activeFilterCount = selectedCountry.length + selectedWarehouse.length;
+    const activeFilterCount = activeCountry.length + activeWarehouse.length;
 
     const [isMobileFilterOpen, setIsMobileFilterOpen] = useState(false);
 
@@ -617,13 +643,13 @@ export default function DashboardClient({
                 <div className={styles.filterSectionTitleMobile}>Град</div>
                 <div className={styles.cityChips}>
                     <button
-                        className={`${styles.chip} ${selectedCountry.length === 0 ? styles.chipActive : ''}`}
+                        className={`${styles.chip} ${activeCountry.length === 0 ? styles.chipActive : ''}`}
                         onClick={() => removeFilter('country')}
                     >Всички</button>
                     {countries.map(c => (
                         <button
                             key={c.name}
-                            className={`${styles.chip} ${selectedCountry.includes(c.name) ? styles.chipActive : ''}`}
+                            className={`${styles.chip} ${activeCountry.includes(c.name) ? styles.chipActive : ''}`}
                             onClick={() => toggleFilter('country', c.name)}
                         >
                             {c.name}
