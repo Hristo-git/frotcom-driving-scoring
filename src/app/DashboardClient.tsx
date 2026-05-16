@@ -562,6 +562,7 @@ export default function DashboardClient({
             )}
         </React.Fragment>
     );
+    };
 
     const activeFilterCount = selectedCountry.length + selectedWarehouse.length;
 
@@ -1154,6 +1155,4 @@ export default function DashboardClient({
             )}
         </div>
     );
-}
-
 }
