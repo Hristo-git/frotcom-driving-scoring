@@ -1156,5 +1156,3 @@ export default function DashboardClient({
     );
 }
 
-}
-}
