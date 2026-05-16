@@ -382,24 +382,109 @@ export default function DashboardClient({
         XLSX.writeFile(wb, `Frotcom_Drivers_${dateStr}.xlsx`);
     };
 
-    const renderDriverRow = (d: PerformanceReport) => (
-        <React.Fragment key={d.driverId}>
-            <tr className={styles.clickableRow} onClick={() => setExpandedDriver(expandedDriver === d.driverId ? null : d.driverId)}>
-                <td style={{ fontWeight: 600 }}>{d.driverName}</td>
-                <td style={{ textAlign: 'center', fontSize: '16px', fontWeight: 800 }} className={getScoreClass(d.score)}>
-                    {formatScore(d.score)}
-                </td>
-                <td style={{ textAlign: 'right' }}>
-                    {d.distance > 0 ? formatKm(d.distance) : '—'}
-                </td>
-            </tr>
-            {expandedDriver === d.driverId && (
-                <tr>
-                    <td colSpan={3} style={{ padding: '12px 16px', background: 'rgba(0, 0, 0, 0.2)', borderBottom: '1px solid var(--border-color)' }}>
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                            <div>
-                                <div style={{ fontSize: '0.85em', color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '8px' }}>Основни показатели:</div>
-                                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', fontSize: '0.9em' }}>
+    const renderDriverRow = (d: PerformanceReport) => {
+        const isExpanded = expandedDriver === d.driverId;
+        
+        return (
+            <React.Fragment key={d.driverId}>
+                {/* Mobile Card View */}
+                <div 
+                    className={`${styles.mobileCard} ${isExpanded ? styles.mobileCardExpanded : ''}`}
+                    onClick={() => setExpandedDriver(isExpanded ? null : d.driverId)}
+                >
+                    <div className={styles.mobileCardHeader}>
+                        <div className={styles.mobileCardMainInfo}>
+                            <div className={styles.mobileCardName}>{d.driverName}</div>
+                            <div className={styles.mobileCardDistance}>{d.distance > 0 ? formatKm(d.distance) : '—'}</div>
+                        </div>
+                        <div className={`${styles.mobileCardScore} ${getScoreClass(d.score)}`}>
+                            {formatScore(d.score)}
+                        </div>
+                    </div>
+                    
+                    {isExpanded && (
+                        <div className={styles.mobileCardContent}>
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', marginTop: '12px' }}>
+                                <div>
+                                    <div style={{ fontSize: '0.85em', color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '8px' }}>Основни показатели:</div>
+                                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', fontSize: '0.9em' }}>
+                                        {(() => {
+                                            const idleColor = getIndicatorColor('idling', d.idling);
+                                            const rpmColor = getIndicatorColor('rpm', d.rpm);
+                                            const consColor = getIndicatorColor('consumption', d.consumption);
+                                            return (
+                                                <>
+                                                    <div style={{ background: idleColor.bg, padding: '4px 8px', borderRadius: '4px', border: `1px solid ${idleColor.border}` }}>
+                                                        <span style={{ color: '#cbd5e1' }}>Работа на място: </span>
+                                                        <span style={{ fontWeight: 'bold', color: idleColor.text }}>{d.idling}%</span>
+                                                    </div>
+                                                    <div style={{ background: rpmColor.bg, padding: '4px 8px', borderRadius: '4px', border: `1px solid ${rpmColor.border}` }}>
+                                                        <span style={{ color: '#cbd5e1' }}>Превишени обороти: </span>
+                                                        <span style={{ fontWeight: 'bold', color: rpmColor.text }}>{d.rpm}%</span>
+                                                    </div>
+                                                    <div style={{ background: consColor.bg, padding: '4px 8px', borderRadius: '4px', border: `1px solid ${consColor.border}` }}>
+                                                        <span style={{ color: '#cbd5e1' }}>Разход: </span>
+                                                        <span style={{ fontWeight: 'bold', color: consColor.text }}>{d.consumption > 0 ? `${formatConsumption(d.consumption)} L/100km` : `—`}</span>
+                                                    </div>
+                                                </>
+                                            );
+                                        })()}
+                                    </div>
+                                </div>
+
+                                {d.events && Object.keys(d.events).length > 0 && (
+                                    <div>
+                                        <div style={{ fontSize: '0.85em', color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '8px' }}>Влияещи фактори (на 100км):</div>
+                                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '8px' }}>
+                                            {Object.entries(d.events).map(([key, count]) => {
+                                                const trans = EVENT_TRANSLATIONS[key] || { label: key };
+                                                const Icon = trans.Icon as any;
+                                                const color = getIndicatorColor(key, count as number, d.distance);
+                                                const valPer100 = d.distance > 0 ? formatConsumption((count as number) / d.distance * 100) : (count as number);
+
+                                                return (
+                                                    <div key={key} style={{
+                                                        display: 'flex',
+                                                        alignItems: 'center',
+                                                        gap: '8px',
+                                                        background: color.bg,
+                                                        padding: '6px 10px',
+                                                        borderRadius: '8px',
+                                                        border: `1px solid ${color.border}`
+                                                    }}>
+                                                        {Icon && <Icon style={{ width: 14, height: 14, color: color.text }} />}
+                                                        <div style={{ display: 'flex', flexDirection: 'column' }}>
+                                                            <span style={{ fontSize: '10px', color: '#94a3b8' }}>{trans.label}</span>
+                                                            <span style={{ fontWeight: 600, fontSize: '12px', color: color.text }}>{valPer100}</span>
+                                                        </div>
+                                                    </div>
+                                                );
+                                            })}
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+                    )}
+                </div>
+
+                {/* Desktop Table Row View */}
+                <tr className={`${styles.clickableRow} ${styles.desktopOnly}`} onClick={() => setExpandedDriver(isExpanded ? null : d.driverId)}>
+                    <td style={{ fontWeight: 600 }}>{d.driverName}</td>
+                    <td style={{ textAlign: 'center', fontSize: '16px', fontWeight: 800 }} className={getScoreClass(d.score)}>
+                        {formatScore(d.score)}
+                    </td>
+                    <td style={{ textAlign: 'right' }}>
+                        {d.distance > 0 ? formatKm(d.distance) : '—'}
+                    </td>
+                </tr>
+                {isExpanded && (
+                    <tr className={styles.desktopOnly}>
+                        <td colSpan={3} style={{ padding: '12px 16px', background: 'rgba(0, 0, 0, 0.2)', borderBottom: '1px solid var(--border-color)' }}>
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                                <div>
+                                    <div style={{ fontSize: '0.85em', color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '8px' }}>Основни показатели:</div>
+                                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', fontSize: '0.9em' }}>
                                     {(() => {
                                         const idleColor = getIndicatorColor('idling', d.idling);
                                         const rpmColor = getIndicatorColor('rpm', d.rpm);
