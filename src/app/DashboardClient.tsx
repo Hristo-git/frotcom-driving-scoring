@@ -1095,7 +1095,7 @@ export default function DashboardClient({
                             <h2 className={styles.sectionTitle} style={{ marginTop: 0, color: '#10b981' }}>Отлични ({excellentPct}%)</h2>
                             <div className={styles.tableContainer} style={{ maxHeight: '400px', overflowY: 'auto' }}>
                                 <table className={styles.table}>
-                                    <thead style={{ position: 'sticky', top: 0, background: 'var(--card-bg)', zIndex: 1 }}>
+                                    <thead className={styles.desktopOnly} style={{ position: 'sticky', top: 0, background: 'var(--card-bg)', zIndex: 1 }}>
                                         <tr>
                                             <th style={{ textAlign: 'left', minWidth: 150 }}>ШОФЬОР</th>
                                             <th style={{ textAlign: 'center', minWidth: 80 }}>ТОЧКИ</th>
@@ -1115,7 +1115,7 @@ export default function DashboardClient({
                             <h2 className={styles.sectionTitle} style={{ marginTop: 0, color: '#f59e0b' }}>Добри ({goodPct}%)</h2>
                             <div className={styles.tableContainer} style={{ maxHeight: '400px', overflowY: 'auto' }}>
                                 <table className={styles.table}>
-                                    <thead style={{ position: 'sticky', top: 0, background: 'var(--card-bg)', zIndex: 1 }}>
+                                    <thead className={styles.desktopOnly} style={{ position: 'sticky', top: 0, background: 'var(--card-bg)', zIndex: 1 }}>
                                         <tr>
                                             <th style={{ textAlign: 'left', minWidth: 150 }}>ШОФЬОР</th>
                                             <th style={{ textAlign: 'center', minWidth: 80 }}>ТОЧКИ</th>
@@ -1135,7 +1135,7 @@ export default function DashboardClient({
                             <h2 className={styles.sectionTitle} style={{ marginTop: 0, color: '#ef4444' }}>Внимание ({attentionPct}%)</h2>
                             <div className={styles.tableContainer} style={{ maxHeight: '400px', overflowY: 'auto' }}>
                                 <table className={styles.table}>
-                                    <thead style={{ position: 'sticky', top: 0, background: 'var(--card-bg)', zIndex: 1 }}>
+                                    <thead className={styles.desktopOnly} style={{ position: 'sticky', top: 0, background: 'var(--card-bg)', zIndex: 1 }}>
                                         <tr>
                                             <th style={{ textAlign: 'left', minWidth: 150 }}>ШОФЬОР</th>
                                             <th style={{ textAlign: 'center', minWidth: 80 }}>ТОЧКИ</th>
