@@ -164,16 +164,33 @@ export default function DashboardClient({
         params.set('start', `${start}T00:00:00.000Z`);
         params.set('end', `${end}T23:59:59.999Z`);
 
-        const currentValues = params.getAll(type);
-        if (currentValues.includes(value)) {
-            const newValues = currentValues.filter(v => v !== value);
-            params.delete(type);
-            newValues.forEach(v => params.append(type, v));
-        } else {
-            if (type === 'country') {
-                params.delete('warehouse');
+        if (type === 'country') {
+            const currentCountries = params.getAll('country');
+            params.delete('country');
+            params.delete('warehouse'); // Clear warehouse since warehouse belongs to a country
+            
+            // Exclusive single-select: if it wasn't selected, select it. If it was, we deselect it (All).
+            if (!currentCountries.includes(value)) {
+                params.set('country', value);
             }
-            params.append(type, value);
+        } else if (type === 'warehouse') {
+            const currentWarehouses = params.getAll('warehouse');
+            params.delete('warehouse');
+            
+            // Exclusive single-select for warehouse
+            if (!currentWarehouses.includes(value)) {
+                params.set('warehouse', value);
+            }
+        } else {
+            // brand/model remain multi-select
+            const currentValues = params.getAll(type);
+            if (currentValues.includes(value)) {
+                const newValues = currentValues.filter(v => v !== value);
+                params.delete(type);
+                newValues.forEach(v => params.append(type, v));
+            } else {
+                params.append(type, value);
+            }
         }
         router.push(`/?${params.toString()}`);
     };
