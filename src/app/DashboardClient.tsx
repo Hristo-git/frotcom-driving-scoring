@@ -1238,7 +1238,7 @@ export default function DashboardClient({
                                 <div className={styles.chartsSection}>
                                     <div className={styles.card} style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
                                         <h2 className={styles.sectionTitle} style={{ marginTop: 0 }}>Warehouse Performance</h2>
-                                        <div style={{ flex: 1, minHeight: 0 }}>
+                                        <div style={{ flex: 1, minHeight: Math.max(280, chartData.length * 38) }}>
                                             <WarehouseChart
                                                 data={chartData}
                                                 selectedWarehouses={selectedWarehouse}
