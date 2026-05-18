@@ -108,7 +108,7 @@ export default function WarehouseChart({ data, selectedWarehouses = [], onWareho
                         <LabelList
                             dataKey="score"
                             position="right"
-                            formatter={(v: number) => formatScore(v)}
+                            formatter={(v) => formatScore(Number(v))}
                             style={{ fill: '#f1f5f9', fontSize: 11, fontWeight: 700 }}
                         />
                         {sortedData.map((entry, index) => {
