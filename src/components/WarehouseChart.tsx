@@ -10,7 +10,8 @@ import {
     CartesianGrid,
     Tooltip,
     ResponsiveContainer,
-    Cell
+    Cell,
+    LabelList
 } from 'recharts';
 
 interface WarehouseData {
@@ -72,7 +73,7 @@ export default function WarehouseChart({ data, selectedWarehouses = [], onWareho
             <ResponsiveContainer width="100%" height="100%">
                 <BarChart
                     data={sortedData}
-                    margin={{ top: 20, right: 30, left: 40, bottom: 20 }}
+                    margin={{ top: 20, right: 48, left: 40, bottom: 20 }}
                     layout="vertical" // Horizontal bars often look better in dashboards for long names
                 >
                     <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" horizontal={false} />
@@ -104,6 +105,12 @@ export default function WarehouseChart({ data, selectedWarehouses = [], onWareho
                         }}
                         style={{ cursor: 'pointer' }}
                     >
+                        <LabelList
+                            dataKey="score"
+                            position="right"
+                            formatter={(v: number) => formatScore(v)}
+                            style={{ fill: '#f1f5f9', fontSize: 11, fontWeight: 700 }}
+                        />
                         {sortedData.map((entry, index) => {
                             const isSelected = selectedWarehouses.includes(entry.name);
 
