@@ -65,10 +65,10 @@ export default function WarehouseChart({ data, selectedWarehouses = [], onWareho
         );
     }
 
-    const minHeight = Math.max(150, sortedData.length * 40);
+    const chartHeight = Math.max(280, sortedData.length * 40);
 
     return (
-        <div style={{ width: '100%', minHeight: `${minHeight}px`, height: '100%' }}>
+        <div style={{ width: '100%', height: `${chartHeight}px` }}>
             <ResponsiveContainer width="100%" height="100%">
                 <BarChart
                     data={sortedData}
