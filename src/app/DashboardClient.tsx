@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { formatKm, formatScore, formatConsumption } from '../../lib/formatters';
 import * as XLSX from 'xlsx';
 import styles from './dashboard.module.css';
@@ -599,6 +599,90 @@ export default function DashboardClient({
 
     const [isMobileFilterOpen, setIsMobileFilterOpen] = useState(false);
 
+    useEffect(() => {
+        document.body.style.overflow = isMobileFilterOpen ? 'hidden' : '';
+        return () => { document.body.style.overflow = ''; };
+    }, [isMobileFilterOpen]);
+
+    // ── Vehicle mobile card ──
+    const renderVehicleMobileCard = (v: VehiclePerformance, i: number) => (
+        <div key={i} className={styles.vehicleMobileCard}>
+            <div className={styles.vehicleMobileCardTop}>
+                <div>
+                    <div className={styles.vehiclePlateLabel}>{v.licensePlate}</div>
+                    <div className={styles.vehicleMakeModel}>{v.manufacturer} {v.model}</div>
+                </div>
+                <div className={`${styles.mobileCardScore} ${getScoreClass(v.score)}`}>
+                    {formatScore(v.score)}
+                </div>
+            </div>
+            <div className={styles.vehicleMobileCardBottom}>
+                <span>{formatKm(v.distance)}</span>
+                {v.fuelConsumption > 0 && <span>{formatConsumption(v.fuelConsumption)} L/100km</span>}
+            </div>
+        </div>
+    );
+
+    // ── Driver mobile card for "Шофьори" view (with recommendations) ──
+    const renderDriverFullMobileCard = (d: PerformanceReport) => {
+        const isExpanded = expandedDriver === d.driverId;
+        const recs = deriveRecommendations(d);
+        return (
+            <div
+                key={d.driverId}
+                className={`${styles.mobileCard} ${isExpanded ? styles.mobileCardExpanded : ''}`}
+                onClick={() => setExpandedDriver(isExpanded ? null : d.driverId)}
+            >
+                <div className={styles.mobileCardHeader}>
+                    <div className={styles.mobileCardMainInfo}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                            <span style={{ width: 8, height: 8, borderRadius: '50%', flexShrink: 0, background: d.score >= 7 ? '#10b981' : d.score >= 4 ? '#f59e0b' : '#ef4444', display: 'inline-block' }} />
+                            <span className={styles.mobileCardName}>{d.driverName}</span>
+                        </div>
+                        <div className={styles.mobileCardDistance}>
+                            {d.distance > 0 ? formatKm(d.distance) : '—'}
+                            {d.consumption > 0 && ` • ${formatConsumption(d.consumption)} L/100km`}
+                            {d.drivingTime > 0 && ` • ${formatTime(d.drivingTime)} ч.`}
+                        </div>
+                    </div>
+                    <div className={`${styles.mobileCardScore} ${getScoreClass(d.score)}`}>
+                        {formatScore(d.score)}
+                    </div>
+                </div>
+
+                {isExpanded && (
+                    <div className={styles.mobileCardContent}>
+                        <div style={{ marginTop: '12px' }}>
+                            <div style={{ fontSize: '0.8em', color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '10px', fontWeight: 700 }}>
+                                Препоръки:
+                            </div>
+                            {d.score >= 7.0 && recs.length === 0 ? (
+                                <div style={{ color: '#10b981', display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.9em' }}>
+                                    <span>🏆</span> Браво! Шофирането е в отлични граници.
+                                </div>
+                            ) : recs.length === 0 ? (
+                                <div style={{ color: '#94a3b8', fontSize: '0.9em', fontStyle: 'italic' }}>
+                                    <span>📈</span> Следете показателите за по-добри резултати.
+                                </div>
+                            ) : (
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                                    {recs.map((rec, idx) => (
+                                        <div key={idx} style={{ display: 'flex', gap: '8px', alignItems: 'flex-start', padding: '8px 10px', background: 'rgba(255,255,255,0.03)', borderRadius: '6px', border: '1px solid rgba(255,255,255,0.05)' }}>
+                                            <span style={{ color: '#f59e0b', flexShrink: 0 }}>💡</span>
+                                            <span style={{ color: '#f1f5f9', fontSize: '0.9em', lineHeight: '1.4' }}>
+                                                {RECOMMENDATION_TRANSLATIONS[rec] || rec}
+                                            </span>
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                )}
+            </div>
+        );
+    };
+
     return (
         <div className={styles.container}>
             {/* ── TOP BAR ── */}
@@ -852,7 +936,15 @@ export default function DashboardClient({
                         </div>
                     </div>
 
-                    <div className={styles.tableContainer} style={{ maxHeight: '70vh', overflowY: 'auto' }}>
+                    {/* Mobile: vehicle cards */}
+                    <div className={styles.mobileOnly}>
+                        {filteredVehicles.length > 0 ? filteredVehicles.map(renderVehicleMobileCard) : (
+                            <div style={{ textAlign: 'center', padding: '40px', color: '#94a3b8' }}>Няма намерени автомобили за избраните филтри.</div>
+                        )}
+                    </div>
+
+                    {/* Desktop: full table */}
+                    <div className={`${styles.tableContainer} ${styles.desktopOnly}`} style={{ maxHeight: '70vh', overflowY: 'auto' }}>
                         <table className={styles.table}>
                             <thead style={{ position: 'sticky', top: 0, background: 'var(--card-bg)', zIndex: 1 }}>
                                 <tr>
@@ -916,7 +1008,15 @@ export default function DashboardClient({
                         </button>
                     </div>
 
-                    <div className={styles.tableContainer} style={{ maxHeight: '70vh', overflowY: 'auto' }}>
+                    {/* Mobile: driver cards with recommendations */}
+                    <div className={styles.mobileOnly}>
+                        {sortedDrivers.length > 0
+                            ? sortedDrivers.map(renderDriverFullMobileCard)
+                            : <div style={{ textAlign: 'center', padding: '40px', color: '#94a3b8' }}>Няма данни</div>}
+                    </div>
+
+                    {/* Desktop: full table */}
+                    <div className={`${styles.tableContainer} ${styles.desktopOnly}`} style={{ maxHeight: '70vh', overflowY: 'auto' }}>
                         <table className={styles.table}>
                             <thead style={{ position: 'sticky', top: 0, background: 'var(--card-bg)', zIndex: 1 }}>
                                 <tr>
