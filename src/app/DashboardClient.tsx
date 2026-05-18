@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useTransition, useOptimistic } from 'react';
 import { formatKm, formatScore, formatConsumption } from '../../lib/formatters';
 import * as XLSX from 'xlsx';
 import styles from './dashboard.module.css';
@@ -88,6 +88,15 @@ export default function DashboardClient({
 }: DashboardProps) {
     // ... [console.log omitted for brevity]
     const router = useRouter();
+    const [isPending, startTransition] = useTransition();
+    const [optimisticCountry, setOptimisticCountry] = useOptimistic<string[], string[]>(
+        selectedCountry,
+        (_, next) => next
+    );
+    const [optimisticWarehouse, setOptimisticWarehouse] = useOptimistic<string[], string[]>(
+        selectedWarehouse,
+        (_, next) => next
+    );
     const [start, setStart] = useState(startDate.split('T')[0]);
     const [end, setEnd] = useState(endDate.split('T')[0]);
     const [mode, setMode] = useState<'single' | 'range'>('range');
@@ -127,7 +136,10 @@ export default function DashboardClient({
             const shortKey = ({ harshAccelerationLow: 'hal', harshAccelerationHigh: 'hah', harshBrakingLow: 'hbl', harshBrakingHigh: 'hbh', harshCornering: 'hc', accelBrakeSwitch: 'abs', excessiveIdling: 'ei', highRPM: 'hr', alarms: 'al', noCruiseControl: 'ncc', accelDuringCruise: 'adc' } as any)[key];
             if (shortKey) params.set(shortKey, (val as number).toString());
         });
-        router.push(`/?${params.toString()}`);
+        setIsMobileFilterOpen(false);
+        startTransition(() => {
+            router.push(`/?${params.toString()}`);
+        });
     };
 
     const handleApplyFilter = () => {
@@ -153,34 +165,50 @@ export default function DashboardClient({
             if (shortKey) params.set(shortKey, (val as number).toString());
         });
 
-        router.push(`/?${params.toString()}`);
+        setIsMobileFilterOpen(false);
+        startTransition(() => {
+            router.push(`/?${params.toString()}`);
+        });
     };
 
     // ── Client-side filter toggles driven by URL (smooth Next.js soft navigation) ──
     const toggleFilter = (type: 'country' | 'warehouse' | 'brand' | 'model', value: string) => {
         const params = new URLSearchParams(window.location.search);
-        
+
         // Ensure we preserve the state values for start/end in the URL
         params.set('start', `${start}T00:00:00.000Z`);
         params.set('end', `${end}T23:59:59.999Z`);
+
+        let nextCountry: string[] | undefined;
+        let nextWarehouse: string[] | undefined;
 
         if (type === 'country') {
             const currentCountries = params.getAll('country');
             params.delete('country');
             params.delete('warehouse'); // Clear warehouse since warehouse belongs to a country
-            
+
             // Exclusive single-select: if it wasn't selected, select it. If it was, we deselect it (All).
             if (!currentCountries.includes(value)) {
                 params.set('country', value);
+                nextCountry = [value];
+            } else {
+                nextCountry = [];
             }
+            nextWarehouse = [];
+            // Single-select filter applied → close the mobile drawer so the user sees the result
+            setIsMobileFilterOpen(false);
         } else if (type === 'warehouse') {
             const currentWarehouses = params.getAll('warehouse');
             params.delete('warehouse');
-            
+
             // Exclusive single-select for warehouse
             if (!currentWarehouses.includes(value)) {
                 params.set('warehouse', value);
+                nextWarehouse = [value];
+            } else {
+                nextWarehouse = [];
             }
+            setIsMobileFilterOpen(false);
         } else {
             // brand/model remain multi-select
             const currentValues = params.getAll(type);
@@ -192,12 +220,17 @@ export default function DashboardClient({
                 params.append(type, value);
             }
         }
-        router.push(`/?${params.toString()}`);
+
+        startTransition(() => {
+            if (nextCountry !== undefined) setOptimisticCountry(nextCountry);
+            if (nextWarehouse !== undefined) setOptimisticWarehouse(nextWarehouse);
+            router.push(`/?${params.toString()}`);
+        });
     };
 
     const removeFilter = (type: 'country' | 'warehouse' | 'brand' | 'model') => {
         const params = new URLSearchParams(window.location.search);
-        
+
         // Ensure we preserve the state values for start/end in the URL
         params.set('start', `${start}T00:00:00.000Z`);
         params.set('end', `${end}T23:59:59.999Z`);
@@ -206,7 +239,16 @@ export default function DashboardClient({
         if (type === 'country') {
             params.delete('warehouse');
         }
-        router.push(`/?${params.toString()}`);
+
+        startTransition(() => {
+            if (type === 'country') {
+                setOptimisticCountry([]);
+                setOptimisticWarehouse([]);
+            } else if (type === 'warehouse') {
+                setOptimisticWarehouse([]);
+            }
+            router.push(`/?${params.toString()}`);
+        });
     };
 
     const handleDriverSort = (field: string) => {
@@ -595,7 +637,7 @@ export default function DashboardClient({
     );
     };
 
-    const activeFilterCount = selectedCountry.length + selectedWarehouse.length;
+    const activeFilterCount = optimisticCountry.length + optimisticWarehouse.length;
 
     const [isMobileFilterOpen, setIsMobileFilterOpen] = useState(false);
 
@@ -685,6 +727,7 @@ export default function DashboardClient({
 
     return (
         <div className={styles.container}>
+            {isPending && <div className={styles.loadingBar} aria-hidden="true" />}
             {/* ── TOP BAR ── */}
             <header className={styles.topBar}>
                 <div className={styles.brandArea}>
@@ -732,13 +775,13 @@ export default function DashboardClient({
                 <div className={styles.filterSectionTitleMobile}>Град</div>
                 <div className={styles.cityChips}>
                     <button
-                        className={`${styles.chip} ${selectedCountry.length === 0 ? styles.chipActive : ''}`}
+                        className={`${styles.chip} ${optimisticCountry.length === 0 ? styles.chipActive : ''}`}
                         onClick={() => removeFilter('country')}
                     >Всички</button>
                     {countries.map(c => (
                         <button
                             key={c.name}
-                            className={`${styles.chip} ${selectedCountry.includes(c.name) ? styles.chipActive : ''}`}
+                            className={`${styles.chip} ${optimisticCountry.includes(c.name) ? styles.chipActive : ''}`}
                             onClick={() => toggleFilter('country', c.name)}
                         >
                             {c.name}
@@ -788,15 +831,15 @@ export default function DashboardClient({
             </div>
 
             {/* Active filter badges */}
-            {activeFilterCount > 0 && (
+            {(optimisticCountry.length + optimisticWarehouse.length) > 0 && (
                 <div className={styles.filterBadgeContainer}>
-                    {selectedCountry.length > 0 && selectedCountry.map(c => (
+                    {optimisticCountry.map(c => (
                         <div key={c} className={styles.filterBadge}>
                             <span>Град: {c}</span>
                             <button onClick={() => toggleFilter('country', c)}>×</button>
                         </div>
                     ))}
-                    {selectedWarehouse.length > 0 && selectedWarehouse.map(w => (
+                    {optimisticWarehouse.map(w => (
                         <div key={w} className={styles.filterBadge}>
                             <span>Склад: {w}</span>
                             <button onClick={() => toggleFilter('warehouse', w)}>×</button>
